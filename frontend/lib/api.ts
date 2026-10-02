@@ -6,7 +6,7 @@ import financialsFixture from '@/mocks/financials.json';
 import reconciliationFixture from '@/mocks/reconciliation.json';
 import askFixture from '@/mocks/ask.json';
 import type { Answer, Bill, Document, ExportResult, Financials, Reconciliation, Role, Rule, Vendor } from './types';
-import { normalizeFinancials, normalizeReconciliation, type LegacyFinancials } from './contracts';
+import { normalizeBill, normalizeDocument, normalizeFinancials, normalizeReconciliation, normalizeRule, normalizeVendor, toApiRule, type ApiBill, type ApiDocument, type ApiRule, type ApiVendor, type LegacyFinancials } from './contracts';
 import { localDocuments } from './local-documents';
 import { validateLocalApi } from './local-mode';
 
@@ -38,24 +38,24 @@ async function request<T>(path: string, body?: unknown): Promise<T> {
   return response.json() as Promise<T>;
 }
 export const api = {
-  documents: () => USE_LOCAL_API ? Promise.resolve(clone(localDocuments)) : USE_MOCKS ? Promise.resolve(clone(documents)) : request<Document[]>('/documents'),
-  document: (id: string) => { if (!USE_MOCKS && !USE_LOCAL_API) return request<Document>(`/documents/${encodeURIComponent(id)}`); const doc = (USE_LOCAL_API ? localDocuments : documents).find(d => d.id === id); return doc ? Promise.resolve(clone(doc)) : Promise.reject(new Error(USE_LOCAL_API ? `Source ${id} is not available in D's local document metadata. The local server has no document-preview endpoint.` : 'Document not found')); },
-  bills: () => USE_LOCAL_API ? Promise.resolve([] as Bill[]) : USE_MOCKS ? Promise.resolve(clone(bills)) : request<Bill[]>('/bills'),
-  vendors: () => USE_LOCAL_API ? Promise.resolve([] as Vendor[]) : USE_MOCKS ? Promise.resolve(clone(vendors)) : request<Vendor[]>('/vendors'),
-  rules: () => USE_LOCAL_API ? Promise.resolve([] as Rule[]) : USE_MOCKS ? Promise.resolve(clone(rules)) : request<Rule[]>('/rules'),
+  documents: () => USE_LOCAL_API ? Promise.resolve(clone(localDocuments)) : USE_MOCKS ? Promise.resolve(clone(documents)) : request<ApiDocument[]>('/documents').then(list => list.map(normalizeDocument)),
+  document: (id: string) => { if (!USE_MOCKS && !USE_LOCAL_API) return request<ApiDocument>(`/documents/${encodeURIComponent(id)}`).then(normalizeDocument); const doc = (USE_LOCAL_API ? localDocuments : documents).find(d => d.id === id); return doc ? Promise.resolve(clone(doc)) : Promise.reject(new Error(USE_LOCAL_API ? `Source ${id} is not available in D's local document metadata. The local server has no document-preview endpoint.` : 'Document not found')); },
+  bills: () => USE_LOCAL_API ? Promise.resolve([] as Bill[]) : USE_MOCKS ? Promise.resolve(clone(bills)) : request<ApiBill[]>('/bills').then(list => list.map(normalizeBill)),
+  vendors: () => USE_LOCAL_API ? Promise.resolve([] as Vendor[]) : USE_MOCKS ? Promise.resolve(clone(vendors)) : request<ApiVendor[]>('/vendors').then(list => list.map(normalizeVendor)),
+  rules: () => USE_LOCAL_API ? Promise.resolve([] as Rule[]) : USE_MOCKS ? Promise.resolve(clone(rules)) : request<ApiRule[]>('/rules').then(list => list.map(normalizeRule)),
   financials: (period: string) => MOCK_D ? Promise.resolve(mockFinancials()) : request<Financials | LegacyFinancials>(`/financials?period=${encodeURIComponent(period)}`).then(normalizeFinancials),
   reconciliation: (period: string) => MOCK_D ? Promise.resolve(clone(reconciliationFixture)) : request<Parameters<typeof normalizeReconciliation>[0]>(`/revenue/reconciliation?period=${encodeURIComponent(period)}`).then(normalizeReconciliation),
   ask: (question: string) => MOCK_D ? Promise.resolve({ ...clone(askFixture), answer: `Demo response (sample context): ${askFixture.answer}` } as Answer) : request<Answer>('/ask', { question }),
   async decision(id: string, decision: 'approve' | 'reject', comment: string, role: Role) {
     if (USE_LOCAL_API) throw new Error('D’s local server does not support bill decisions.');
-    if (!USE_MOCKS) { const result = await request<{ id: string; status: string }>(`/bills/${encodeURIComponent(id)}/decision`, { decision, comment }); changed(); return result; }
+    if (!USE_MOCKS) { const result = await request<{ billId: string; status: string }>(`/bills/${encodeURIComponent(id)}/decision`, { decision, comment }); changed(); return { id: result.billId ?? id, status: result.status }; }
     const bill = bills.find(b => b.id === id);
     if (!bill || bill.status !== 'pending_approval') throw new Error('This bill is not awaiting approval.');
     if (role !== 'partner' && role !== 'owner') throw new Error('Switch to Owner or Partner to make a decision.');
     if (decision === 'approve' && bill.ruleHits.some(hit => hit.includes('missing'))) throw new Error('Upload the vendor W-9 and void check before approval.');
     bill.status = decision === 'approve' ? 'scheduled' : 'rejected'; changed(); return { id, status: bill.status };
   },
-  async createRule(input: Omit<Rule, 'id'>) { if (USE_LOCAL_API) throw new Error('D’s local server does not support rules.'); if (!USE_MOCKS) return request<Rule[]>('/rules', input); rules.push({ ...input, id: crypto.randomUUID() }); changed(); return clone(rules); },
+  async createRule(input: Omit<Rule, 'id'>) { if (USE_LOCAL_API) throw new Error('D’s local server does not support rules.'); if (!USE_MOCKS) { await request<ApiRule>('/rules', toApiRule(input)); changed(); return api.rules(); } rules.push({ ...input, id: crypto.randomUUID() }); changed(); return clone(rules); },
   async upload(file: File, onProgress: (status: string) => void, signal?: AbortSignal): Promise<Document> {
     if (USE_LOCAL_API) throw new Error('D’s local server does not support uploads.');
     if (file.size > 20 * 1024 * 1024) throw new Error('Files must be smaller than 20 MB.');
@@ -70,7 +70,7 @@ export const api = {
         onProgress('Extracting fields');
         const doc = await api.document(documentId);
         if (['failed', 'error'].includes(doc.status)) throw new Error('Processing failed. Please try another document.');
-        if (['processed', 'completed', 'ready', 'pending_review', 'pending_approval'].includes(doc.status)) { changed(); return doc; }
+        if (['processed', 'completed', 'ready', 'needs_review', 'pending_review', 'pending_approval'].includes(doc.status)) { changed(); return doc; }
         await new Promise(resolve => setTimeout(resolve, 2000));
       }
       throw new Error('Processing is taking longer than expected. Check the Library for updates.');
