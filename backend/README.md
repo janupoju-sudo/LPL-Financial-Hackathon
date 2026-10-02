@@ -14,6 +14,7 @@ sam build && sam deploy --guided       # first time; stack name ledgerline-dev
 # When prompted for BedrockModelId, enter the exact model ID enabled for this account.
 # Do not accept a default: the parameter is required for Ask and document classification.
 python scripts/seed.py --table ledgerline-dev
+python scripts/seed_ddb.py --table ledgerline-dev  # 12 months of history; leaves Sep 2026 for the live demo
 python scripts/demo_users.py --user-pool-id <UserPoolId> --client-id <UserPoolClientId>
 ```
 Stack outputs give you `ApiUrl`, `UserPoolId`, `UserPoolClientId`, `DocsBucketName`,
@@ -32,7 +33,7 @@ curl -H "Authorization: Bearer $TOKEN_OWNER" "$API/bills?status=pending_approval
 ```bash
 cd backend && python -m venv .venv && source .venv/bin/activate
 pip install -r requirements-dev.txt
-pytest -q            # 53 tests: rules engine, ledger, bill lifecycle, financials, reconciliation, ask, export (moto)
+pytest -q
 cfn-lint template.yaml
 ```
 
@@ -89,9 +90,9 @@ Money in the API is **dollars**. Money in the ledger is **integer cents**.
 
 ## Contract for B (Document AI / ingest)
 
-1. **Uploads land at** `uploads/<practiceId>/<documentId>/<filename>` in `DocsBucketName`. S3 → EventBridge is enabled; add your own `Object Created` rule (prefix `uploads/`) to start `IngestDocument`. `LockDocumentFunction` already listens too and applies Object Lock retention, so you don't need to handle that.
+1. **Uploads land at** `uploads/<practiceId>/<documentId>/<filename>` in `DocsBucketName`. The SAM template already routes S3 `Object Created` events under `uploads/` to `IngestDocument`; `LockDocumentFunction` also listens and applies Object Lock retention, so you don't need to handle either trigger.
 2. **Update the document** as you go: `repo.update_document(practice_id, document_id, type="invoice", status="extracting"|"processed"|"needs_review", confidence=0.93, extracted={...})`. Types: `invoice · receipt · void_check · w9 · payout_statement · unknown`.
-3. **Invoices/receipts → invoke `CreateBillFunction`** (ARN in outputs; add it to your state machine policies) with:
+3. **Invoices/receipts → invoke `CreateBillFunction`** (ARN in outputs; the SAM state machine policy already grants this invocation) with:
    ```json
    {"practiceId":"p1","documentId":"doc_..","vendorId":"ven_..","vendorName":"Orion Software LLC",
     "amount":1850.00,"invoiceNumber":"INV-2041","invoiceDate":"2026-09-28","dueDate":"2026-10-28",

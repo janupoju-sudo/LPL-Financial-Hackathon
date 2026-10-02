@@ -41,15 +41,15 @@ Dependencies are noted as `← B3` (wait on, or mock, that task).
 
 ## B — Document AI
 **P0**
-- [HM] B1. `classify` Lambda: Bedrock prompt → `{type, confidence}` across 5 doc types
-- [HM] B2. `extract_expense` Lambda: Textract **AnalyzeExpense** → raw fields + line items
-- [HM] B3. `extract_tables` Lambda: Textract **AnalyzeDocument (TABLES, FORMS)** for payout statements, void checks, W-9s
-- [HM] B4. `normalize` Lambda: Bedrock maps Textract output → our JSON schema (strict JSON, validated) + confidence
-- [HM] B5. `match_vendor` Lambda: exact/alias → fuzzy match (e.g. `rapidfuzz`); set `defaultGlAccount` from history; create the vendor if new ← C3
-- [HM] B6. Step Functions `IngestDocument` ASL: classify → branch → normalize → match → create Bill / RevenueLines → start `ApproveBill` ← C4
-- [HM] B7. EventBridge rule: S3 `Object Created` in `uploads/` → start `IngestDocument` ← E3 (SAM wiring added; awaiting merge/deploy)
+- [x] B1. `classify` Lambda: Bedrock prompt → `{type, confidence}` across 5 doc types
+- [x] B2. `extract_expense` Lambda: Textract **AnalyzeExpense** → raw fields + line items
+- [x] B3. `extract_tables` Lambda: Textract **AnalyzeDocument (TABLES, FORMS)** for payout statements, void checks, W-9s
+- [x] B4. `normalize` Lambda: Bedrock maps Textract output → our JSON schema (strict JSON, validated) + confidence
+- [x] B5. `match_vendor` Lambda: exact/alias → fuzzy match (e.g. `rapidfuzz`); set `defaultGlAccount` from history; create the vendor if new ← C3
+- [x] B6. Step Functions `IngestDocument` ASL: classify → branch → normalize → match → create Bill / RevenueLines → start `ApproveBill` ← C4
+- [x] B7. EventBridge rule: S3 `Object Created` in `uploads/` → start `IngestDocument` ← E3
 - [ ] B8. Test on **all seed docs** (E5); tune prompts until every demo doc extracts correctly
-- [HM] B9. Void check / W-9 → update vendor `hasVoidCheck`, `hasW9`, `bankLast4`
+- [x] B9. Void check / W-9 → update vendor `hasVoidCheck`, `hasW9`, `bankLast4`
 
 **P1**
 - [ ] B10. Duplicate/suspicious vendor flag (same bank details, different vendor name)
