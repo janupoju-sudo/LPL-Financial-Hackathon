@@ -51,8 +51,9 @@ START = (2025, 9)
 END = (2026, 8)
 SEPT_DEMO = (2026, 9)
 SOURCE_START = (2025, 9)
+SEEDED_SOURCE_PREFIX = "seed-sources"
 LEASE_DOC_ID = "doc_lease_amendment_2026_07"
-SEPT_PAYOUT_DOC_ID = "doc_lpl_payout_statement_sep_2026"
+SEPT_PAYOUT_DOC_ID = "doc_lpl_payout_statement_sep_2026_fallback"
 
 
 def months(first, last):
@@ -248,23 +249,9 @@ def build(include_sept=False, live_sept=False):
                     f"Paid operating expenses {tag}", None))
 
         if split_sources:
-            for label, account, amount, source_doc in (
-                ("rent", "6200", rent, LEASE_DOC_ID),
-                ("compliance", "6600", compliance, compliance_doc_id(year, month)),
-            ):
-                cents = ledger.to_cents(amount)
-                out.append((
-                    f"j-expense-{label}-{tag}", entry_date,
-                    [{"account": account, "debit": cents},
-                     {"account": coa.ACCOUNTS_PAYABLE, "credit": cents}],
-                    f"{label.title()} expense {tag}", source_doc,
-                ))
-                out.append((
-                    f"j-expense-paid-{label}-{tag}", entry_date,
-                    [{"account": coa.ACCOUNTS_PAYABLE, "debit": cents},
-                     {"account": coa.CASH, "credit": cents}],
-                    f"Paid {label} expense {tag}", source_doc,
-                ))
+            out.extend(attributed_expense_journals(
+                tag, entry_date, rent, compliance, compliance_doc_id(year, month)
+            ))
 
         out.append((f"j-distribution-{tag}", entry_date,
                     [{"account": "3100", "debit": ledger.to_cents(MONTHLY_DISTRIBUTION)},
@@ -289,21 +276,9 @@ def build(include_sept=False, live_sept=False):
               {"account": coa.CASH, "credit": total}],
              f"Paid operating expenses {tag}", None),
         ])
-        for label, account, amount, source_doc in (
-            ("rent", "6200", rent, LEASE_DOC_ID),
-            ("compliance", "6600", compliance, compliance_doc_id(year, month)),
-        ):
-            cents = ledger.to_cents(amount)
-            out.extend([
-                (f"j-expense-{label}-{tag}", entry_date,
-                 [{"account": account, "debit": cents},
-                  {"account": coa.ACCOUNTS_PAYABLE, "credit": cents}],
-                 f"{label.title()} expense {tag}", source_doc),
-                (f"j-expense-paid-{label}-{tag}", entry_date,
-                 [{"account": coa.ACCOUNTS_PAYABLE, "debit": cents},
-                  {"account": coa.CASH, "credit": cents}],
-                 f"Paid {label} expense {tag}", source_doc),
-            ])
+        out.extend(attributed_expense_journals(
+            tag, entry_date, rent, compliance, compliance_doc_id(year, month)
+        ))
         out.append((f"j-distribution-{tag}", entry_date,
                     [{"account": "3100", "debit": ledger.to_cents(MONTHLY_DISTRIBUTION)},
                      {"account": coa.CASH, "credit": ledger.to_cents(MONTHLY_DISTRIBUTION)}],
@@ -343,13 +318,24 @@ def has_september_payout(practice_id):
 def _reject_legacy_split_expenses(practice_id):
     from shared import ddb
 
-    for month in (7, 8):
+    for month in (7, 8, 9):
         tag = month_tag(2026, month)
         old_lines = ddb.query_prefix(practice_id, f"LEDGER#2026-{month:02d}#j-expenses-{tag}#")
         if any(line.get("account") in {"6200", "6600"} for line in old_lines):
             raise RuntimeError(
                 f"Legacy {tag} aggregate expense journal already includes rent/compliance; "
                 "refusing to add split journals and double-count. Migrate that month first."
+            )
+        combined_compliance = ddb.query_prefix(
+            practice_id, f"LEDGER#2026-{month:02d}#j-expense-compliance-{tag}#"
+        )
+        combined_payment = ddb.query_prefix(
+            practice_id, f"LEDGER#2026-{month:02d}#j-expense-paid-compliance-{tag}#"
+        )
+        if combined_compliance or combined_payment:
+            raise RuntimeError(
+                f"Legacy {tag} combined compliance journals exist; refusing to duplicate "
+                "the $3,100 base and $2,550 consultant expense. Migrate that month first."
             )
 
 

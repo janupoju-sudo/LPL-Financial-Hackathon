@@ -67,8 +67,12 @@ def test_generate_docs_produces_expected_manifest_and_parser_contract(tmp_path):
     assert "Status:" not in pdf_bytes
 
     source_documents = manifest["source_documents"]
-    assert len(source_documents) == 16
+    assert len(source_documents) == 17
     assert all(document["upload_status"] == "pending" for document in source_documents)
+    assert all(document["s3_key_template"].startswith("seed-sources/") for document in source_documents)
+    workflow_docs = manifest["files"]
+    assert len(workflow_docs) == 7
+    assert all(document["s3_key_template"].startswith("uploads/") for document in workflow_docs)
     lease = next(document for document in source_documents if document["document_id"] == "doc_lease_amendment_2026_07")
     assert lease["monthly_rent_dollars"] == 12_200
     compliance = [document for document in source_documents if document["document_type"] == "invoice"
@@ -81,3 +85,12 @@ def test_generate_docs_produces_expected_manifest_and_parser_contract(tmp_path):
     assert all("{practiceId}" in document["s3_key_template"] for document in source_documents)
     assert (tmp_path / lease["local_path"]).exists()
     assert (tmp_path / historical_payouts[0]["local_path"]).exists()
+    fallback = next(document for document in source_documents
+                    if document["document_type"] == "payout_statement_fallback")
+    assert (tmp_path / fallback["local_path"]).exists()
+    assert fallback["document_id"] != payout["document_id"]
+
+    template = (ROOT / "backend" / "template.yaml").read_text()
+    assert "prefix: uploads/" in template
+    assert all(not document["s3_key_template"].startswith("uploads/")
+               for document in source_documents)
