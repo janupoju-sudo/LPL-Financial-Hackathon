@@ -12,6 +12,13 @@ def _document_fields(event: Mapping[str, Any]) -> tuple[dict[str, str], dict[str
     return upload, normalized
 
 
+def _bill_confidence(normalized: Mapping[str, Any]) -> float:
+    return min(
+        normalized.get("confidence", 0.0),
+        normalized.get("vendorConfidence", 0.0),
+    )
+
+
 def prepare_bill(
     event: Mapping[str, Any], context: Any = None
 ) -> dict[str, Any]:
@@ -26,7 +33,7 @@ def prepare_bill(
         "invoiceDate": normalized.get("invoiceDate"),
         "dueDate": normalized.get("dueDate"),
         "lineItems": normalized.get("lineItems", []),
-        "confidence": normalized.get("confidence", 0.0),
+        "confidence": _bill_confidence(normalized),
     }
     vendor_id = (vendor or {}).get("vendorId")
     if vendor_id:
@@ -167,26 +174,30 @@ def handler(event: Mapping[str, Any], context: Any = None) -> dict[str, Any]:
 
 
 def complete_bill_handler(event: Mapping[str, Any], context: Any = None) -> dict[str, Any]:
-    from shared import repo
+    from shared import config, repo
 
     upload, normalized = _document_fields(event)
     bill_response = event["createdBill"]["data"]
     bill = bill_response.get("bill", bill_response)
+    effective_confidence = _bill_confidence(normalized)
     status = (
         "needs_review"
         if bill.get("status") == "pending_review"
-        or normalized.get("confidence", 0.0) < 0.8
+        or effective_confidence < config.REVIEW_CONFIDENCE_THRESHOLD
         else "processed"
     )
     extracted = dict(normalized)
     if status == "needs_review" and not extracted.get("reviewReason"):
-        extracted["reviewReason"] = "Bill was created in pending review"
+        if normalized.get("vendorConfidence", 0.0) < config.REVIEW_CONFIDENCE_THRESHOLD:
+            extracted["reviewReason"] = "Vendor identity confidence requires confirmation"
+        else:
+            extracted["reviewReason"] = "Bill was created in pending review"
     repo.update_document(
         upload["practiceId"],
         upload["documentId"],
         type=normalized["type"],
         status=status,
-        confidence=normalized.get("confidence", 0.0),
+        confidence=effective_confidence,
         extracted=extracted,
         billId=bill.get("billId"),
     )
