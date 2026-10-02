@@ -200,7 +200,7 @@ def make_receipt(path: Path, *, filename: str) -> None:
 
 
 def make_payout_statement(path: Path, *, filename: str) -> None:
-    pdf = canvas.Canvas(str(path), pagesize=letter)
+    pdf = canvas.Canvas(str(path), pagesize=letter, pageCompression=0)
     pdf.setTitle("LPL Payout Statement September 2026")
     add_watermark(pdf)
     pdf.setFillColor(HexColor("#0F172A"))
@@ -211,31 +211,76 @@ def make_payout_statement(path: Path, *, filename: str) -> None:
     pdf.setFont("Helvetica-Bold", 12)
     pdf.drawString(0.75 * inch, 8.75 * inch, "Revenue summary")
 
-    rows = [
-        ("Advisory fees", "$182,400.00"),
-        ("Mutual fund commissions", "$14,200.00"),
-        ("Monthly 12b-1 trails (ref 12b1)", "$6,150.00"),
-        ("Variable annuity trail, contract 4471 (actual)", "$2,478.00"),
-        ("Variable annuity trail, contract 4471 (expected)", "$2,890.00"),
-        ("Total paid", "$205,228.00"),
+    row_data = [
+        ("Advisory fees", "advisory", "", "$182,400.00"),
+        ("Mutual fund commissions", "commission", "", "$14,200.00"),
+        ("Monthly 12b-1 trails", "trail", "12b1", "$6,150.00"),
+        ("Variable annuity trail, contract 4471", "trail", "4471", "$2,478.00"),
     ]
-    y = 8.2 * inch
-    for label, value in rows:
-        pdf.setFont("Helvetica", 10)
-        pdf.drawString(0.9 * inch, y, label)
-        pdf.drawRightString(7.5 * inch, y, value)
-        y -= 0.35 * inch
+
+    headers = ["Description", "Source", "Reference", "Amount"]
+    col_x = [0.9 * inch, 3.0 * inch, 4.8 * inch, 6.5 * inch]
+    y = 7.95 * inch
+    pdf.setFillColor(HexColor("#E2E8F0"))
+    pdf.rect(0.7 * inch, y - 0.2 * inch, 7.1 * inch, 0.32 * inch, fill=1, stroke=1)
+    pdf.setFillColor(HexColor("#0F172A"))
+    pdf.setFont("Helvetica-Bold", 9)
+    for idx, header in enumerate(headers):
+        pdf.drawString(col_x[idx], y - 0.08 * inch, header)
+
+    pdf.setFont("Helvetica", 9)
+    for row_index, (description, source, reference, amount) in enumerate(row_data, start=1):
+        row_y = y - row_index * 0.42 * inch - 0.12 * inch
+        pdf.rect(0.7 * inch, row_y - 0.2 * inch, 7.1 * inch, 0.32 * inch, fill=0, stroke=1)
+        pdf.drawString(col_x[0], row_y, description)
+        pdf.drawString(col_x[1], row_y, source)
+        pdf.drawString(col_x[2], row_y, reference)
+        pdf.drawRightString(col_x[3] + 0.6 * inch, row_y, amount)
 
     pdf.setFont("Helvetica-Bold", 11)
-    pdf.drawString(0.9 * inch, 4.8 * inch, "Contract 4471 variance")
+    pdf.drawString(0.9 * inch, 3.4 * inch, "Total paid")
+    pdf.drawRightString(7.3 * inch, 3.4 * inch, "$205,228.00")
     pdf.setFont("Helvetica", 10)
-    pdf.drawString(0.9 * inch, 4.45 * inch, "Actual: $2,478.00")
-    pdf.drawString(0.9 * inch, 4.1 * inch, "Expected: $2,890.00")
-    pdf.drawString(0.9 * inch, 3.75 * inch, "Variance: -$412.00 (-41200 cents)")
+    pdf.drawString(0.9 * inch, 2.9 * inch, "Actual: $2,478.00")
+    pdf.drawString(0.9 * inch, 2.55 * inch, "Expected: $2,890.00")
+    pdf.drawString(0.9 * inch, 2.2 * inch, "Shortfall: $412.00")
     pdf.setFont("Helvetica-Bold", 12)
-    pdf.drawString(0.9 * inch, 3.1 * inch, "Status: short")
+    pdf.drawString(0.9 * inch, 1.75 * inch, "Status: short")
     add_footer(pdf, filename)
     pdf.save()
+
+
+def payout_rows() -> list[dict[str, object]]:
+    return [
+        {
+            "id": "adv-1",
+            "source": "advisory",
+            "label": "Advisory fees",
+            "actual": 18_240_000,
+            "ref": "",
+        },
+        {
+            "id": "comm-1",
+            "source": "commission",
+            "label": "Mutual fund commissions",
+            "actual": 1_420_000,
+            "ref": "",
+        },
+        {
+            "id": "trail-12b1",
+            "source": "trail",
+            "label": "Monthly 12b-1 trails",
+            "actual": 615_000,
+            "ref": "12b1",
+        },
+        {
+            "id": "trail-4471",
+            "source": "trail",
+            "label": "Variable annuity trail, contract 4471",
+            "actual": 247_800,
+            "ref": "4471",
+        },
+    ]
 
 
 def build_manifest(output_dir: Path) -> dict:
@@ -357,10 +402,14 @@ def build_manifest(output_dir: Path) -> dict:
                     "monthly_12b1_trails": 6150.00,
                     "actual_4471_cents": 247800,
                     "expected_4471_cents": 289000,
-                    "total_paid": 205228.00,
+                    "total_paid": 205228,
+                    "revenueLines": payout_rows(),
                 },
                 "workflow_outcome": {
                     "status": "short",
+                    "total_paid": 205228,
+                    "actual_4471_cents": 247800,
+                    "expected_4471_cents": 289000,
                     "variance_cents": -41200,
                     "reason": "contract 4471 shortfall: actual 247800, expected 289000",
                 },
