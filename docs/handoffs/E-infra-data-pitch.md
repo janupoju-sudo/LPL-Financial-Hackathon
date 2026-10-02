@@ -30,8 +30,15 @@ Practice META: Harbor Point Wealth (fictional), 180 clients, top-10 share 22%, `
 **Ledger history (E7):** write journals with `ledger.post_journal(...)` so they're balanced and in D's format. See `backend/README.md` → "Contract for D". Use integer cents via the line helpers (`bill_accrual_lines`, `payout_lines`, …).
 
 ## Demo reset (E9)
-- Object Lock means the stored version of each upload **can't be permanently removed or overwritten for `RetentionDays`**. That's the point (books and records). For resets, **delete DynamoDB items and leave S3 alone**. Old files just sit there, unreferenced.
-- Reset = delete `BILL#`, `DOC#`, `LEDGER#`, `REV#` items under `PRACTICE#p1`, re-run `seed.py` + your history seed. Leave `RULE#` and `VENDOR#` (or reset vendors' `hasW9/hasVoidCheck` for Brightline).
+- Pause uploads and wait for all Step Functions executions for the selected practice to finish before execution. The reset refuses bills in `processing`, `pending_approval`, `pending_docs`, or the intermediate `approved` state, but does not query/cancel Step Functions executions.
+- Preview first; execution is never implicit:
+	```bash
+	cd backend
+	python scripts/reset_demo.py --table ledgerline-dev --practice p1
+	python scripts/reset_demo.py --table ledgerline-dev --practice p1 --execute
+	```
+- Only records under the selected `PRACTICE#<id>` partition are eligible. The reset removes demo bills and `uploads/` document records, ledger postings linked to those records, and September 2026 `REV#` entries/payout postings. It preserves META, rules, supporting `seed-sources/` documents, historical ledger/revenue, and September baseline expense/payment journals. Brightline is restored to `hasW9=false`, `hasVoidCheck=false`; its demo bank suffix is cleared.
+- Object Lock means S3 versions **can't be permanently removed or overwritten for `RetentionDays`**. The reset never accesses S3; old upload objects may remain unreferenced. It does not invoke either seed script. It is safe to repeat.
 
 ## Talking points for the deck (verified in code)
 - **Right AWS service for the job:** Step Functions `waitForTaskToken` = native human approval; EventBridge decouples "W-9 arrived" from "un-hold the bill"; S3 Object Lock = tamper-proof books and records; DynamoDB transactions = a journal can never be half-written.

@@ -108,6 +108,34 @@ exclusive. Rent and compliance journals for July onward cite the lease amendment
 and month-specific consultant invoice; legacy July/August aggregate expense rows
 are detected and rejected rather than duplicated.
 
+### Reset demo records (E9)
+
+Pause uploads first and wait until all Step Functions executions for the selected
+practice are terminal. The script also refuses to execute while bills are in
+`processing`, `pending_approval`, `pending_docs`, or the intermediate `approved`
+state; it does not cancel workflows.
+
+Preview the selected practice before applying the reset:
+
+```bash
+cd backend
+python scripts/reset_demo.py --table ledgerline-dev --practice p1
+python scripts/reset_demo.py --table ledgerline-dev --practice p1 --execute
+```
+
+The default is read-only; mutations require the explicit `--execute`, `--table`,
+and `--practice` arguments. The reset removes that practice's bills, uploaded
+demo document records, ledger postings linked to those bills/documents, and all
+September 2026 revenue-line records, including live/fallback payout entries. It
+preserves META, rules, supporting `seed-sources/` document records, seeded
+historical journals/revenue, and September baseline expense/payment journals.
+Brightline's W-9/void-check flags are reset to missing and its demo bank suffix is
+removed. The operation is practice-scoped and safe to repeat.
+
+S3 objects are never deleted or overwritten; Object Lock retention remains in
+force. Old uploads may remain in S3 without DynamoDB references. The reset does
+not invoke `seed.py` or `seed_ddb.py`.
+
 ---
 
 ## Contract for B (Document AI / ingest)
