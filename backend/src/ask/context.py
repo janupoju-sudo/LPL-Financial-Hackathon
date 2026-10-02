@@ -9,7 +9,7 @@ import re
 from datetime import date
 
 from shared import coa
-from functions.financials import kpis, periods, statements
+from financials import kpis, periods, statements
 
 MAX_DOCS = 6
 
@@ -73,6 +73,11 @@ def ledger_summary(entries, period: str) -> tuple[str, list[str]]:
     return "\n".join(rows), drivers
 
 
+def doc_id(d: dict) -> str:
+    """Documents are keyed "documentId" in the table (C); the API contract says "id"."""
+    return d.get("documentId") or d.get("id")
+
+
 def _tokens(text: str) -> set[str]:
     return {t for t in re.findall(r"[a-z0-9]+", text.lower()) if t not in _STOP and len(t) > 2}
 
@@ -89,7 +94,7 @@ def pick_documents(question: str, documents, entries, period: str, drivers: list
     scored = []
     for d in documents:
         hay = _tokens(" ".join(str(d.get(k) or "") for k in ("filename", "vendorName", "type")))
-        score = 2 * len(q & hay) + (3 if d["id"] in driver_docs else 0)
+        score = 2 * len(q & hay) + (3 if doc_id(d) in driver_docs else 0)
         if score:
             scored.append((score, d.get("createdAt") or "", d))
     scored.sort(key=lambda s: s[1], reverse=True)  # newest first...
@@ -114,7 +119,7 @@ def build(question: str, entries, documents, today: date) -> dict:
     period = pick_period(question, entries, today)
     summary, drivers = ledger_summary(entries, period)
     docs = pick_documents(question, documents, entries, period, drivers)
-    doc_lines = [f"[{d['id']}] {doc_label(d)}: {doc_snippet(d)}" for d in docs] or ["(no matching documents)"]
+    doc_lines = [f"[{doc_id(d)}] {doc_label(d)}: {doc_snippet(d)}" for d in docs] or ["(no matching documents)"]
     text = (f"LEDGER SUMMARY\n{summary}\n\nBIGGEST CHANGES: "
             + ", ".join(f"{c} {coa.get(c).name}" for c in drivers)
             + "\n\nDOCUMENTS (cite by the id in brackets)\n" + "\n".join(doc_lines))

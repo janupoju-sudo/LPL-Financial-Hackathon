@@ -1,20 +1,86 @@
-# Role D resources, ready to paste under `Resources:` in backend/template.yaml (E1).
+# Role D resources, ready to paste under `Resources:` in backend/template.yaml.
 #
-# Assumes the template defines these; rename the !Ref / !GetAtt targets if E used other names:
-#   Table            the DynamoDB single table
-#   DocumentsBucket  S3 documents bucket (Object Lock)
-#   ExportsBucket    S3 exports bucket
-#   HttpApi          the AWS::Serverless::HttpApi with the Cognito authorizer
-#
-# CodeUri is backend/ (where template.yaml lives) because the code imports
-# `shared.*` and `functions.*` from there. backend/requirements.txt adds the
-# anthropic SDK for Ask.
+# Uses the template's existing names: LedgerTable, DocsBucket, HttpApi.
+# CodeUri (src/), runtime, TABLE_NAME, DOCS_BUCKET and DEFAULT_PRACTICE_ID come from Globals.
+# src/requirements.txt adds the anthropic SDK (Ask calls Claude on Bedrock).
 
-  # ---------- D8: Bedrock Guardrail for Ask your books ----------
+  # ---------------------------------------------------------------- D: financials
+  # GET /financials (D2/D3/D7) and GET /revenue/reconciliation (D4)
+  FinancialsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: financials.handler.handler
+      MemorySize: 512
+      Policies:
+        - DynamoDBReadPolicy: { TableName: !Ref LedgerTable }
+      Events:
+        GetFinancials: { Type: HttpApi, Properties: { ApiId: !Ref HttpApi, Path: /financials, Method: GET } }
+        GetReconciliation: { Type: HttpApi, Properties: { ApiId: !Ref HttpApi, Path: /revenue/reconciliation, Method: GET } }
+
+  # POST /ask (D5)
+  AskFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: ask.handler.handler
+      Timeout: 29          # HTTP APIs cut off at 30s
+      MemorySize: 512
+      Environment:
+        Variables:
+          ASK_MODEL_ID: anthropic.claude-opus-5-5
+          GUARDRAIL_ID: !GetAtt AskGuardrail.GuardrailId
+          GUARDRAIL_VERSION: !GetAtt AskGuardrailVersion.Version
+      Policies:
+        - DynamoDBReadPolicy: { TableName: !Ref LedgerTable }
+        - Statement:
+            - Effect: Allow
+              Action: [bedrock:InvokeModel, bedrock:InvokeModelWithResponseStream]
+              Resource: "*"
+            - Effect: Allow
+              Action: bedrock:ApplyGuardrail
+              Resource: !GetAtt AskGuardrail.GuardrailArn
+      Events:
+        Ask: { Type: HttpApi, Properties: { ApiId: !Ref HttpApi, Path: /ask, Method: POST } }
+
+  # POST /export (D6)
+  ExportFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: export.handler.handler
+      Timeout: 29
+      MemorySize: 1024
+      Environment:
+        Variables:
+          EXPORTS_BUCKET: !Ref ExportsBucket
+      Policies:
+        - DynamoDBReadPolicy: { TableName: !Ref LedgerTable }
+        - S3ReadPolicy: { BucketName: !Ref DocsBucket }
+        - S3CrudPolicy: { BucketName: !Ref ExportsBucket }
+      Events:
+        Export: { Type: HttpApi, Properties: { ApiId: !Ref HttpApi, Path: /export, Method: POST } }
+
+  # Export ZIPs are temporary; the documents themselves stay in DocsBucket.
+  ExportsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault: { SSEAlgorithm: AES256 }
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: ExpireExports
+            Status: Enabled
+            ExpirationInDays: 1
+
+  # ---------------------------------------------------------------- D8: guardrail for Ask
   AskGuardrail:
     Type: AWS::Bedrock::Guardrail
     Properties:
-      Name: ledgerline-ask
+      Name: !Sub ledgerline-ask-${Stage}
       Description: Keeps Ask your books on the practice's own finances and masks personal information.
       BlockedInputMessaging: >-
         I can only answer questions about your practice's own books, like revenue,
@@ -36,18 +102,10 @@
               - What's the best ETF to recommend this quarter?
       ContentPolicyConfig:
         FiltersConfig:
-          - Type: PROMPT_ATTACK
-            InputStrength: HIGH
-            OutputStrength: NONE   # prompt-attack filtering only applies to input
-          - Type: MISCONDUCT
-            InputStrength: MEDIUM
-            OutputStrength: MEDIUM
-          - Type: HATE
-            InputStrength: MEDIUM
-            OutputStrength: MEDIUM
-          - Type: INSULTS
-            InputStrength: MEDIUM
-            OutputStrength: MEDIUM
+          - { Type: PROMPT_ATTACK, InputStrength: HIGH, OutputStrength: NONE }
+          - { Type: MISCONDUCT, InputStrength: MEDIUM, OutputStrength: MEDIUM }
+          - { Type: HATE, InputStrength: MEDIUM, OutputStrength: MEDIUM }
+          - { Type: INSULTS, InputStrength: MEDIUM, OutputStrength: MEDIUM }
       SensitiveInformationPolicyConfig:
         # Person names are left alone on purpose: answers need vendor and staff names.
         PiiEntitiesConfig:
@@ -55,10 +113,10 @@
           - { Type: US_BANK_ACCOUNT_NUMBER, Action: ANONYMIZE }
           - { Type: US_BANK_ROUTING_NUMBER, Action: ANONYMIZE }
           - { Type: CREDIT_DEBIT_CARD_NUMBER, Action: ANONYMIZE }
+          - { Type: US_INDIVIDUAL_TAX_IDENTIFICATION_NUMBER, Action: ANONYMIZE }
           - { Type: EMAIL, Action: ANONYMIZE }
           - { Type: PHONE, Action: ANONYMIZE }
           - { Type: ADDRESS, Action: ANONYMIZE }
-          - { Type: US_INDIVIDUAL_TAX_IDENTIFICATION_NUMBER, Action: ANONYMIZE }
 
   AskGuardrailVersion:
     Type: AWS::Bedrock::GuardrailVersion
@@ -66,95 +124,8 @@
       GuardrailIdentifier: !GetAtt AskGuardrail.GuardrailId
       Description: Demo version
 
-  # ---------- D2/D3/D7: GET /financials ----------
-  FinancialsFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      CodeUri: .
-      Handler: functions.financials.handler.financials_handler
-      Runtime: python3.12
-      Timeout: 15
-      MemorySize: 512
-      Environment:
-        Variables:
-          TABLE_NAME: !Ref Table
-      Policies:
-        - DynamoDBReadPolicy: { TableName: !Ref Table }
-      Events:
-        Api:
-          Type: HttpApi
-          Properties: { ApiId: !Ref HttpApi, Path: /financials, Method: GET }
-
-  # ---------- D4: GET /revenue/reconciliation ----------
-  ReconciliationFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      CodeUri: .
-      Handler: functions.financials.handler.reconciliation_handler
-      Runtime: python3.12
-      Timeout: 15
-      Environment:
-        Variables:
-          TABLE_NAME: !Ref Table
-      Policies:
-        - DynamoDBReadPolicy: { TableName: !Ref Table }
-      Events:
-        Api:
-          Type: HttpApi
-          Properties: { ApiId: !Ref HttpApi, Path: /revenue/reconciliation, Method: GET }
-
-  # ---------- D5: POST /ask ----------
-  AskFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      CodeUri: .
-      Handler: functions.ask.handler.lambda_handler
-      Runtime: python3.12
-      Timeout: 60          # model call; API Gateway HTTP APIs cap at 30s, see note below
-      MemorySize: 512
-      Environment:
-        Variables:
-          TABLE_NAME: !Ref Table
-          ASK_MODEL_ID: anthropic.claude-opus-5-5
-          GUARDRAIL_ID: !GetAtt AskGuardrail.GuardrailId
-          GUARDRAIL_VERSION: !GetAtt AskGuardrailVersion.Version
-      Policies:
-        - DynamoDBReadPolicy: { TableName: !Ref Table }
-        - Statement:
-            - Effect: Allow
-              Action: [bedrock:InvokeModel, bedrock:InvokeModelWithResponseStream]
-              Resource: "*"
-            - Effect: Allow
-              Action: bedrock:ApplyGuardrail
-              Resource: !GetAtt AskGuardrail.GuardrailArn
-      Events:
-        Api:
-          Type: HttpApi
-          Properties: { ApiId: !Ref HttpApi, Path: /ask, Method: POST }
-
-  # ---------- D6: POST /export ----------
-  ExportFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      CodeUri: .
-      Handler: functions.export.handler.lambda_handler
-      Runtime: python3.12
-      Timeout: 60
-      MemorySize: 1024
-      Environment:
-        Variables:
-          TABLE_NAME: !Ref Table
-          DOCUMENTS_BUCKET: !Ref DocumentsBucket
-          EXPORTS_BUCKET: !Ref ExportsBucket
-      Policies:
-        - DynamoDBReadPolicy: { TableName: !Ref Table }
-        - S3ReadPolicy: { BucketName: !Ref DocumentsBucket }
-        - S3CrudPolicy: { BucketName: !Ref ExportsBucket }
-      Events:
-        Api:
-          Type: HttpApi
-          Properties: { ApiId: !Ref HttpApi, Path: /export, Method: POST }
-
-# Note on /ask timing: HTTP APIs time out at 30 seconds. Ask runs at medium effort
-# with a short context, which should fit; if it doesn't in testing, lower effort to
-# "low" in functions/ask/bedrock.py before anything else.
+# Optional, under Outputs: (for running scripts/check_guardrail.py after deploy)
+#   AskGuardrailId:
+#     Value: !GetAtt AskGuardrail.GuardrailId
+#   AskGuardrailVersion:
+#     Value: !GetAtt AskGuardrailVersion.Version

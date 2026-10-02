@@ -4,9 +4,9 @@ import json
 import unittest
 import zipfile
 
-from functions.export import package
-from functions.financials import api
-from tests.fixtures import DOCUMENTS, PRACTICE, sample_entries
+from export import package
+from financials import api
+from fixtures import DOCUMENTS, PRACTICE, sample_entries
 
 
 class Export(unittest.TestCase):

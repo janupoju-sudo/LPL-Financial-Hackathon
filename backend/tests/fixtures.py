@@ -82,14 +82,14 @@ PAYOUT_SEP = [
 
 # Document list as GET /documents returns it, plus s3Key.
 DOCUMENTS = [
-    {"id": "d1", "type": "invoice", "filename": "Brightline_INV-2291.pdf", "vendorName": "Brightline IT Services",
+    {"documentId": "d1", "type": "invoice", "filename": "Brightline_INV-2291.pdf", "vendorName": "Brightline IT Services",
      "amount": 1240.0, "createdAt": "2026-09-29", "s3Key": "uploads/d1.pdf"},
-    {"id": "rent-2026-07", "type": "invoice", "filename": "Summit_Lease_Amendment_Q3.pdf",
+    {"documentId": "rent-2026-07", "type": "invoice", "filename": "Summit_Lease_Amendment_Q3.pdf",
      "vendorName": "Summit Office Partners", "amount": 9800.0, "createdAt": "2026-07-01", "s3Key": "uploads/rent7.pdf"},
-    {"id": "clearpath-2026-09", "type": "invoice", "filename": "Clearpath_Compliance_0917.pdf",
+    {"documentId": "clearpath-2026-09", "type": "invoice", "filename": "Clearpath_Compliance_0917.pdf",
      "vendorName": "Clearpath Compliance", "amount": 850.0, "createdAt": "2026-09-17", "s3Key": "uploads/cp9.pdf"},
-    {"id": "payout-2026-09", "type": "payout_statement", "filename": "LPL_Payout_Sep2026.pdf",
+    {"documentId": "payout-2026-09", "type": "payout_statement", "filename": "LPL_Payout_Sep2026.pdf",
      "vendorName": "LPL Financial", "amount": 218000.0, "createdAt": "2026-09-30", "s3Key": "uploads/payout9.pdf"},
-    {"id": "w9-north", "type": "w9", "filename": "Northgate_W9.pdf", "vendorName": "Northgate Marketing",
+    {"documentId": "w9-north", "type": "w9", "filename": "Northgate_W9.pdf", "vendorName": "Northgate Marketing",
      "amount": None, "createdAt": "2026-06-12", "s3Key": "uploads/w9.pdf"},
 ]

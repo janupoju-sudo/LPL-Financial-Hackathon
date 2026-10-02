@@ -1,8 +1,8 @@
 import unittest
 from datetime import date
 
-from functions.ask import answer, context
-from tests.fixtures import DOCUMENTS, sample_entries
+from ask import answer, context
+from fixtures import DOCUMENTS, sample_entries
 
 TODAY = date(2026, 10, 2)
 no_guard = lambda text, source: (False, text)
@@ -22,14 +22,14 @@ class Period(unittest.TestCase):
 class Context(unittest.TestCase):
     def test_margin_question_finds_rent_and_compliance(self):
         ctx = context.build("Why did my margin drop in Q3?", sample_entries(), DOCUMENTS, TODAY)
-        ids = [d["id"] for d in ctx["documents"]]
+        ids = [context.doc_id(d) for d in ctx["documents"]]
         self.assertIn("rent-2026-07", ids)
         self.assertIn("Operating margin", ctx["text"])
         self.assertIn("6200 Rent and occupancy", ctx["text"])
 
     def test_keyword_match(self):
         ctx = context.build("What did Brightline charge us in September?", sample_entries(), DOCUMENTS, TODAY)
-        self.assertEqual(ctx["documents"][0]["id"], "d1")
+        self.assertEqual(context.doc_id(ctx["documents"][0]), "d1")
 
 
 class Ask(unittest.TestCase):

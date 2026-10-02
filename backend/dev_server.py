@@ -1,6 +1,7 @@
 """Local server for D's endpoints using the fictional sample data. No AWS needed.
 
-    python3 backend/dev_server.py          # http://localhost:8787
+    cd backend && pip install -r requirements-dev.txt   # once (boto3 for C's shared code)
+    python3 dev_server.py                               # http://localhost:8787
 
 Lets the frontend call the real financials code before DynamoDB, Bedrock and
 S3 exist. Ask returns a canned sample answer unless USE_BEDROCK=1 is set.
@@ -15,36 +16,32 @@ import json
 import os
 import re
 import sys
-import types
 from datetime import date
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-sys.path.insert(0, str(Path(__file__).parent))
+HERE = Path(__file__).parent
+sys.path[:0] = [str(HERE / "src"), str(HERE / "tests")]
 
-from tests import fixtures  # noqa: E402
+import fixtures  # noqa: E402
+from shared import ddb, repo  # noqa: E402
 
 PORT = int(os.environ.get("PORT", 8787))
-EXPORT_DIR = Path(__file__).parent / ".dev-exports"
+EXPORT_DIR = HERE / ".dev-exports"
 TODAY = date(2026, 10, 2)  # the sample data runs through Sep 2026
 
 ENTRIES = fixtures.sample_entries()
 
-# Stand-in for C's shared/ddb.py, backed by the sample data.
-fake_ddb = types.ModuleType("shared.ddb")
-fake_ddb.get_ledger_entries = lambda pid, start, end: [
-    e for e in ENTRIES if start <= date.fromisoformat(e["date"]) <= end]
-fake_ddb.get_practice = lambda pid: {**fixtures.PRACTICE, "feeSchedule": fixtures.FEE_SCHEDULE}
-fake_ddb.get_revenue_lines = lambda pid, period: fixtures.PAYOUT_SEP if period == "2026-09" else []
-fake_ddb.list_documents = lambda pid: fixtures.DOCUMENTS
-sys.modules["shared.ddb"] = fake_ddb
-import shared  # noqa: E402
-shared.ddb = fake_ddb
+# Swap C's DynamoDB reads for the sample data. Nothing touches AWS.
+ddb.get_ledger_entries = lambda pid, start, end: [e for e in ENTRIES if str(start) <= e["date"] <= str(end)]
+ddb.get_practice = lambda pid: {**fixtures.PRACTICE, "feeSchedule": fixtures.FEE_SCHEDULE}
+ddb.get_revenue_lines = lambda pid, period: fixtures.PAYOUT_SEP if period == "2026-09" else []
+repo.list_documents = lambda pid, doc_type=None, q=None: fixtures.DOCUMENTS
 
-from functions.ask import answer  # noqa: E402
-from functions.export.package import build_zip  # noqa: E402
-from functions.financials import api, handler as fin  # noqa: E402
+from ask import answer  # noqa: E402
+from export.package import build_zip  # noqa: E402
+from financials import api, handler as fin  # noqa: E402
 
 
 def sample_llm(system, user, schema):
@@ -65,7 +62,7 @@ def no_guard(text, source):
 
 
 if os.environ.get("USE_BEDROCK") == "1":
-    from functions.ask import bedrock
+    from ask import bedrock
     LLM, GUARD = bedrock.claude_json, bedrock.apply_guardrail
 else:
     LLM, GUARD = sample_llm, no_guard
@@ -82,8 +79,8 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
-    def _lambda(self, fn, query):
-        r = fn({"queryStringParameters": {k: v[0] for k, v in query.items()}}, None)
+    def _lambda(self, route, query):
+        r = fin.handler({"routeKey": route, "queryStringParameters": {k: v[0] for k, v in query.items()}})
         self._send(r["statusCode"], json.loads(r["body"]))
 
     def do_OPTIONS(self):
@@ -94,10 +91,10 @@ class Handler(BaseHTTPRequestHandler):
         q = parse_qs(url.query)
         if url.path == "/financials":
             q.setdefault("period", ["2026-Q3"])
-            return self._lambda(fin.financials_handler, q)
+            return self._lambda("GET /financials", q)
         if url.path == "/revenue/reconciliation":
             q.setdefault("period", ["2026-09"])
-            return self._lambda(fin.reconciliation_handler, q)
+            return self._lambda("GET /revenue/reconciliation", q)
         if url.path.startswith("/exports/"):
             f = EXPORT_DIR / Path(url.path).name
             if f.exists():
@@ -112,11 +109,11 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(400, {"error": "Body must be JSON."})
         try:
             if url.path == "/ask":
-                docs = fake_ddb.list_documents("p1")
+                docs = repo.list_documents("p1")
                 return self._send(200, answer.ask(body.get("question", ""), ENTRIES, docs, TODAY, LLM, GUARD))
             if url.path == "/export":
                 period = body.get("period", "2026-Q3")
-                fin_body = api.build_financials(ENTRIES, period, fake_ddb.get_practice("p1"))
+                fin_body = api.build_financials(ENTRIES, period, ddb.get_practice("p1"))
                 data, summary = build_zip(period, fixtures.PRACTICE["name"], fixtures.DOCUMENTS, ENTRIES,
                                           fin_body, lambda key: b"SAMPLE - FICTIONAL DATA\n" + key.encode())
                 EXPORT_DIR.mkdir(exist_ok=True)

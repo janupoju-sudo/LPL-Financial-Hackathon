@@ -55,7 +55,7 @@ def ask(question: str, entries, documents, today: date, llm, guard) -> dict:
 
     _, answer = guard(out["answer"], "OUTPUT")  # masked text if PII was found
 
-    by_id = {d["id"]: d for d in ctx["documents"]}
+    by_id = {context.doc_id(d): d for d in ctx["documents"]}
     seen, citations = set(), []
     for doc_id in out.get("citations", []):
         if doc_id in by_id and doc_id not in seen:  # drop ids the model made up
