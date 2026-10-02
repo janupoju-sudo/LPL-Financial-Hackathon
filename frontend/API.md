@@ -19,7 +19,7 @@ Fixtures live in `mocks/*.json`; TypeScript types are in `lib/types.ts`. IDs are
 | POST | `/export` | `{period}` | `{downloadUrl, documents, ledgerLines, missing}` for a ZIP; counts are numbers, `missing` is a filename array |
 | POST | `/transactions/import` | Raw CSV, `Content-Type: text/csv` | `{imported,categorized,matchedReceipts}` |
 
-The financials contract matches D's code in `backend/src/financials/` (PRs #1 and #2):
+The canonical financials contract matches D's supplied handoff (PRs #1 and #2):
 
 - Top-level `period`.
 - `pnl:{period,revenue,totalRevenue,expenses,totalExpenses,operatingIncome}`; revenue and expense lines are `{account,name,amount}` arrays.
@@ -29,6 +29,8 @@ The financials contract matches D's code in `backend/src/financials/` (PRs #1 an
 - `valuation:{low,mid,high,method,recurringRevenueTtm,multiples:{low,mid,high}}`; `method` is the tooltip text.
 
 The P&L chart shows the selected period's totals. D's endpoint does not return a monthly trend; the frontend does not fabricate one.
+
+Current main subsequently adopted the earlier frontend shape: numeric statement totals, `*Lines` arrays, 0–100 percentages and flag `reason` rather than `message`. `lib/contracts.ts` converts that response into the canonical shape above. Percentage conversion is selected by the P&L shape, not by testing whether a value exceeds 1, so 0.5% is handled correctly. Dollar values and valuation metadata are preserved. Current main supplies optional monthly history; this view still displays the canonical period totals.
 
 Reconciliation is `{period,expected,actual,variance,lines,flags}`. Lines have `{id,label,source,ref,expected,actual,variance,status,docId,reason?}`. Status is `ok | short | over | missing | unexpected`. `ref` and `docId` may be null. Flags have `{lineId,status,severity,message}`; the source document is resolved through the line with matching `id`. Missing sources display a message instead of an invalid document link.
 

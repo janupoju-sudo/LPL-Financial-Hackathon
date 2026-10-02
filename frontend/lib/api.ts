@@ -6,6 +6,7 @@ import financialsFixture from '@/mocks/financials.json';
 import reconciliationFixture from '@/mocks/reconciliation.json';
 import askFixture from '@/mocks/ask.json';
 import type { Answer, Bill, Document, ExportResult, Financials, Reconciliation, Role, Rule, Vendor } from './types';
+import { normalizeFinancials, normalizeReconciliation, type LegacyFinancials } from './contracts';
 
 export const USE_MOCKS = process.env.NEXT_PUBLIC_USE_MOCKS !== 'false';
 const baseUrl = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, '');
@@ -34,8 +35,8 @@ export const api = {
   bills: () => USE_MOCKS ? Promise.resolve(clone(bills)) : request<Bill[]>('/bills'),
   vendors: () => USE_MOCKS ? Promise.resolve(clone(vendors)) : request<Vendor[]>('/vendors'),
   rules: () => USE_MOCKS ? Promise.resolve(clone(rules)) : request<Rule[]>('/rules'),
-  financials: (period: string) => USE_MOCKS ? Promise.resolve(mockFinancials()) : request<Financials>(`/financials?period=${encodeURIComponent(period)}`),
-  reconciliation: (period: string) => USE_MOCKS ? Promise.resolve(clone(reconciliationFixture)) : request<Reconciliation>(`/revenue/reconciliation?period=${encodeURIComponent(period)}`),
+  financials: (period: string) => USE_MOCKS ? Promise.resolve(mockFinancials()) : request<Financials | LegacyFinancials>(`/financials?period=${encodeURIComponent(period)}`).then(normalizeFinancials),
+  reconciliation: (period: string) => USE_MOCKS ? Promise.resolve(clone(reconciliationFixture)) : request<Parameters<typeof normalizeReconciliation>[0]>(`/revenue/reconciliation?period=${encodeURIComponent(period)}`).then(normalizeReconciliation),
   ask: (question: string) => USE_MOCKS ? Promise.resolve({ ...clone(askFixture), answer: `Demo response (sample context): ${askFixture.answer}` } as Answer) : request<Answer>('/ask', { question }),
   async decision(id: string, decision: 'approve' | 'reject', comment: string, role: Role) {
     if (!USE_MOCKS) { const result = await request<{ id: string; status: string }>(`/bills/${encodeURIComponent(id)}/decision`, { decision, comment }); changed(); return result; }
