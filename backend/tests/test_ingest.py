@@ -4,7 +4,7 @@ from types import ModuleType
 from unittest.mock import Mock, patch
 
 from ingest.classify import validate_classification
-from ingest.common import upload_context
+from ingest.common import invoke_bedrock_json, upload_context
 from ingest.match_vendor import best_vendor_match
 from ingest.normalize import (
     _normalized_vendor_document,
@@ -19,6 +19,23 @@ from ingest.route import (
 
 
 class IngestValidationTests(unittest.TestCase):
+    def test_bedrock_converse_does_not_send_deprecated_temperature(self) -> None:
+        client = Mock()
+        client.converse.return_value = {
+            "output": {"message": {"content": [{"text": '{"type":"invoice"}'}]}}
+        }
+        with (
+            patch.dict("os.environ", {"BEDROCK_MODEL_ID": "us.test-model"}),
+            patch("boto3.client", return_value=client),
+        ):
+            result = invoke_bedrock_json("classify")
+
+        self.assertEqual(result, {"type": "invoice"})
+        self.assertEqual(
+            client.converse.call_args.kwargs["inferenceConfig"],
+            {"maxTokens": 1200},
+        )
+
     def test_ask_model_id_must_be_configured(self) -> None:
         from ask.bedrock import model_id
 

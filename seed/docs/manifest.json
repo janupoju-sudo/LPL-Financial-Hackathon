@@ -122,10 +122,43 @@
         "monthly_12b1_trails": 6150.0,
         "actual_4471_cents": 247800,
         "expected_4471_cents": 289000,
-        "total_paid": 205228.0
+        "total_paid": 205228,
+        "revenueLines": [
+          {
+            "id": "adv-1",
+            "source": "advisory",
+            "label": "Advisory fees",
+            "actual": 18240000,
+            "ref": ""
+          },
+          {
+            "id": "comm-1",
+            "source": "commission",
+            "label": "Mutual fund commissions",
+            "actual": 1420000,
+            "ref": ""
+          },
+          {
+            "id": "trail-12b1",
+            "source": "trail",
+            "label": "Monthly 12b-1 trails",
+            "actual": 615000,
+            "ref": "12b1"
+          },
+          {
+            "id": "trail-4471",
+            "source": "trail",
+            "label": "Variable annuity trail, contract 4471",
+            "actual": 247800,
+            "ref": "4471"
+          }
+        ]
       },
       "workflow_outcome": {
         "status": "short",
+        "total_paid": 205228,
+        "actual_4471_cents": 247800,
+        "expected_4471_cents": 289000,
         "variance_cents": -41200,
         "reason": "contract 4471 shortfall: actual 247800, expected 289000"
       }
