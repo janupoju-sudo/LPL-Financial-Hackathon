@@ -2,6 +2,8 @@
 
 Fixtures live in `mocks/*.json`; TypeScript types are in `lib/types.ts`. IDs are encoded in URLs. Live requests carry `Authorization: Bearer <Cognito ID token>` per C's frontend handoff. Amounts use dollars; margin, recurring revenue and expense ratios use 0–1 (nullable when their denominator is unavailable). Dates use ISO strings. Errors should return a non-2xx status and a readable message.
 
+Local integration: `NEXT_PUBLIC_LOCAL_API=true` calls the four D endpoints at `NEXT_PUBLIC_API_URL` without Cognito. Only loopback URLs are accepted. Local mode uses D's fixture document metadata, disables C mutations and supplies empty bills/vendors/rules, so practice loading does not call routes the local server lacks. It does not substitute mock financials on a network failure. Set this flag to false for AWS authentication or the mock demo; `.env.example` defaults to false.
+
 | Method | Endpoint | Request | Response |
 | --- | --- | --- | --- |
 | POST | `/documents/upload-url` | `{filename, contentType}` | `{documentId, uploadUrl}` |
