@@ -7,8 +7,12 @@ import reconciliationFixture from '@/mocks/reconciliation.json';
 import askFixture from '@/mocks/ask.json';
 import type { Answer, Bill, Document, ExportResult, Financials, Reconciliation, Role, Rule, Vendor } from './types';
 import { normalizeFinancials, normalizeReconciliation, type LegacyFinancials } from './contracts';
+import { localDocuments } from './local-documents';
+import { validateLocalApi } from './local-mode';
 
 export const USE_MOCKS = process.env.NEXT_PUBLIC_USE_MOCKS !== 'false';
+export const USE_LOCAL_API = process.env.NEXT_PUBLIC_LOCAL_API === 'true';
+const MOCK_D = USE_MOCKS && !USE_LOCAL_API;
 const baseUrl = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, '');
 const clone = <T,>(value: T): T => structuredClone(value);
 const seedDocuments = documentsFixture as unknown as Document[];
@@ -21,24 +25,29 @@ export function subscribe(listener: () => void) { listeners.add(listener); retur
 function changed() { listeners.forEach(listener => listener()); }
 async function request<T>(path: string, body?: unknown): Promise<T> {
   if (!baseUrl) throw new Error('Set NEXT_PUBLIC_API_URL to connect to the backend.');
-  const { fetchAuthSession } = await import('aws-amplify/auth');
-  const session = await fetchAuthSession();
-  const token = session.tokens?.idToken?.toString();
-  if (!token) throw new Error('Please sign in again.');
-  const response = await fetch(`${baseUrl}${path}`, { method: body === undefined ? 'GET' : 'POST', headers: { Authorization: `Bearer ${token}`, ...(body === undefined ? {} : { 'Content-Type': 'application/json' }) }, body: body === undefined ? undefined : JSON.stringify(body) });
+  const headers: Record<string, string> = body === undefined ? {} : { 'Content-Type': 'application/json' };
+  if (USE_LOCAL_API) validateLocalApi(baseUrl);
+  else {
+    const { fetchAuthSession } = await import('aws-amplify/auth');
+    const token = (await fetchAuthSession()).tokens?.idToken?.toString();
+    if (!token) throw new Error('Please sign in again.');
+    headers.Authorization = `Bearer ${token}`;
+  }
+  const response = await fetch(`${baseUrl}${path}`, { method: body === undefined ? 'GET' : 'POST', headers, body: body === undefined ? undefined : JSON.stringify(body) });
   if (!response.ok) throw new Error(`Request failed (${response.status}): ${(await response.text()).slice(0, 200)}`);
   return response.json() as Promise<T>;
 }
 export const api = {
-  documents: () => USE_MOCKS ? Promise.resolve(clone(documents)) : request<Document[]>('/documents'),
-  document: (id: string) => { if (!USE_MOCKS) return request<Document>(`/documents/${encodeURIComponent(id)}`); const doc = documents.find(d => d.id === id); return doc ? Promise.resolve(clone(doc)) : Promise.reject(new Error('Document not found')); },
-  bills: () => USE_MOCKS ? Promise.resolve(clone(bills)) : request<Bill[]>('/bills'),
-  vendors: () => USE_MOCKS ? Promise.resolve(clone(vendors)) : request<Vendor[]>('/vendors'),
-  rules: () => USE_MOCKS ? Promise.resolve(clone(rules)) : request<Rule[]>('/rules'),
-  financials: (period: string) => USE_MOCKS ? Promise.resolve(mockFinancials()) : request<Financials | LegacyFinancials>(`/financials?period=${encodeURIComponent(period)}`).then(normalizeFinancials),
-  reconciliation: (period: string) => USE_MOCKS ? Promise.resolve(clone(reconciliationFixture)) : request<Parameters<typeof normalizeReconciliation>[0]>(`/revenue/reconciliation?period=${encodeURIComponent(period)}`).then(normalizeReconciliation),
-  ask: (question: string) => USE_MOCKS ? Promise.resolve({ ...clone(askFixture), answer: `Demo response (sample context): ${askFixture.answer}` } as Answer) : request<Answer>('/ask', { question }),
+  documents: () => USE_LOCAL_API ? Promise.resolve(clone(localDocuments)) : USE_MOCKS ? Promise.resolve(clone(documents)) : request<Document[]>('/documents'),
+  document: (id: string) => { if (!USE_MOCKS && !USE_LOCAL_API) return request<Document>(`/documents/${encodeURIComponent(id)}`); const doc = (USE_LOCAL_API ? localDocuments : documents).find(d => d.id === id); return doc ? Promise.resolve(clone(doc)) : Promise.reject(new Error(USE_LOCAL_API ? `Source ${id} is not available in D's local document metadata. The local server has no document-preview endpoint.` : 'Document not found')); },
+  bills: () => USE_LOCAL_API ? Promise.resolve([] as Bill[]) : USE_MOCKS ? Promise.resolve(clone(bills)) : request<Bill[]>('/bills'),
+  vendors: () => USE_LOCAL_API ? Promise.resolve([] as Vendor[]) : USE_MOCKS ? Promise.resolve(clone(vendors)) : request<Vendor[]>('/vendors'),
+  rules: () => USE_LOCAL_API ? Promise.resolve([] as Rule[]) : USE_MOCKS ? Promise.resolve(clone(rules)) : request<Rule[]>('/rules'),
+  financials: (period: string) => MOCK_D ? Promise.resolve(mockFinancials()) : request<Financials | LegacyFinancials>(`/financials?period=${encodeURIComponent(period)}`).then(normalizeFinancials),
+  reconciliation: (period: string) => MOCK_D ? Promise.resolve(clone(reconciliationFixture)) : request<Parameters<typeof normalizeReconciliation>[0]>(`/revenue/reconciliation?period=${encodeURIComponent(period)}`).then(normalizeReconciliation),
+  ask: (question: string) => MOCK_D ? Promise.resolve({ ...clone(askFixture), answer: `Demo response (sample context): ${askFixture.answer}` } as Answer) : request<Answer>('/ask', { question }),
   async decision(id: string, decision: 'approve' | 'reject', comment: string, role: Role) {
+    if (USE_LOCAL_API) throw new Error('D’s local server does not support bill decisions.');
     if (!USE_MOCKS) { const result = await request<{ id: string; status: string }>(`/bills/${encodeURIComponent(id)}/decision`, { decision, comment }); changed(); return result; }
     const bill = bills.find(b => b.id === id);
     if (!bill || bill.status !== 'pending_approval') throw new Error('This bill is not awaiting approval.');
@@ -46,8 +55,9 @@ export const api = {
     if (decision === 'approve' && bill.ruleHits.some(hit => hit.includes('missing'))) throw new Error('Upload the vendor W-9 and void check before approval.');
     bill.status = decision === 'approve' ? 'scheduled' : 'rejected'; changed(); return { id, status: bill.status };
   },
-  async createRule(input: Omit<Rule, 'id'>) { if (!USE_MOCKS) return request<Rule[]>('/rules', input); rules.push({ ...input, id: crypto.randomUUID() }); changed(); return clone(rules); },
+  async createRule(input: Omit<Rule, 'id'>) { if (USE_LOCAL_API) throw new Error('D’s local server does not support rules.'); if (!USE_MOCKS) return request<Rule[]>('/rules', input); rules.push({ ...input, id: crypto.randomUUID() }); changed(); return clone(rules); },
   async upload(file: File, onProgress: (status: string) => void, signal?: AbortSignal): Promise<Document> {
+    if (USE_LOCAL_API) throw new Error('D’s local server does not support uploads.');
     if (file.size > 20 * 1024 * 1024) throw new Error('Files must be smaller than 20 MB.');
     if (!['application/pdf', 'image/png', 'image/jpeg'].includes(file.type)) throw new Error('Choose a PDF, PNG, or JPG document.');
     onProgress('Uploading');
@@ -83,12 +93,13 @@ export const api = {
     documents.unshift(doc); changed(); return clone(doc);
   },
   async export(period: string): Promise<ExportResult> {
-    if (!USE_MOCKS) return request<ExportResult>('/export', { period });
+    if (!MOCK_D) return request<ExportResult>('/export', { period });
     const { buildExport } = await import('./export');
     const result = await buildExport(documents, bills, mockFinancials(), period);
     return { downloadUrl: URL.createObjectURL(result.blob), ...result.summary };
   },
   async importTransactions(file: File) {
+    if (USE_LOCAL_API) throw new Error('D’s local server does not support CSV import.');
     if (USE_MOCKS) throw new Error('CSV import requires the live /transactions/import endpoint.');
     const { fetchAuthSession } = await import('aws-amplify/auth');
     const token = (await fetchAuthSession()).tokens?.idToken?.toString();
