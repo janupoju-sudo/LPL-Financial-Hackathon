@@ -18,7 +18,9 @@ statements.
 
 Supporting source PDFs and the fallback payout attachment use
 `seed-sources/<practiceId>/<documentId>/<filename>`, outside the ingest trigger.
-The seven live workflow documents retain their normal `uploads/` paths.
+The seven live workflow documents retain their normal `uploads/` paths. Do not
+upload supporting PDFs through `/documents/upload-url`: it always creates an
+`uploads/` key, which starts ingestion.
 
 The seed owner uploads supporting PDFs with the uploader merged in PR #27:
 
@@ -26,6 +28,12 @@ The seed owner uploads supporting PDFs with the uploader merged in PR #27:
 cd backend
 python scripts/seed_ddb.py --table ledgerline-dev --practice p1 --live-sept --docs-bucket <DocsBucketName>
 ```
+
+This command is not upload-only: it also writes the idempotent history and the
+supporting DOC# rows. `--live-sept` seeds September baseline expenses and leaves
+the payout for live ingestion. Use `--include-sept` instead only if live payout
+ingestion failed and no successful September payout already exists; the two
+September modes are mutually exclusive.
 
 Use this only after the live-table compliance migration described in the backend
 README. The uploader checks existing objects, uploads missing PDFs and marks
