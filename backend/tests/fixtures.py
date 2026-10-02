@@ -55,3 +55,25 @@ def sample_entries():
     # One September bill still open at quarter end.
     e += _bill("2026-09-29", None, "6300", 1_240, "Brightline IT Services INV-2291", doc="d1")
     return e
+
+
+# Fee schedule and September payout lines for the reconciliation demo.
+# The annuity trail on contract 4471 comes in $412 short.
+FEE_SCHEDULE = [
+    {"id": "adv", "label": "Advisory fees", "source": "advisory",
+     "basis": "fixed", "amount": 182_400_00, "frequency": "monthly"},
+    {"id": "mf-comm", "label": "Mutual fund commissions", "source": "commission",
+     "basis": "fixed", "amount": 14_200_00, "frequency": "monthly"},
+    {"id": "12b1", "label": "12b-1 trails", "source": "trail", "ref": "12b1",
+     "basis": "fixed", "amount": 6_150_00, "frequency": "monthly"},
+    {"id": "va-4471", "label": "Variable annuity trail, contract …4471", "source": "trail",
+     "ref": "4471", "basis": "aum", "aum": 1_156_000_00, "annualRate": 0.01,
+     "frequency": "quarterly"},
+]
+
+PAYOUT_SEP = [
+    {"id": "x1", "source": "advisory", "label": "Advisory fees", "actual": 182_400_00, "docId": "d3"},
+    {"id": "x2", "source": "commission", "label": "Mutual fund commissions", "actual": 14_200_00, "docId": "d3"},
+    {"id": "x3", "source": "trail", "ref": "12b1", "label": "12b-1 trails", "actual": 6_150_00, "docId": "d3"},
+    {"id": "x4", "source": "trail", "ref": "4471", "label": "VA trail 4471", "actual": 2_478_00, "docId": "d3"},
+]
