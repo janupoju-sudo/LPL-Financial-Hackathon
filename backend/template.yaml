@@ -215,6 +215,17 @@ Resources:
         CreateRule: { Type: HttpApi, Properties: { ApiId: !Ref HttpApi, Path: /rules, Method: POST } }
         UpdateRule: { Type: HttpApi, Properties: { ApiId: !Ref HttpApi, Path: "/rules/{id}", Method: PATCH } }
 
+  # C11: card CSV import -> categorized j-card-* journals + receipt matching
+  TransactionsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: handlers.transactions.handler
+      Timeout: 29          # HTTP APIs cut off at 30s; import is capped at 500 rows
+      Policies:
+        - DynamoDBCrudPolicy: { TableName: !Ref LedgerTable }
+      Events:
+        ImportTransactions: { Type: HttpApi, Properties: { ApiId: !Ref HttpApi, Path: /transactions/import, Method: POST } }
+
   # ---------------------------------------------------------------- D: financials
   # GET /financials (D2/D3/D7) and GET /revenue/reconciliation (D4)
   FinancialsFunction:
