@@ -102,6 +102,8 @@ Resources:
       UserPoolName: !Sub ledgerline-${Stage}
       UsernameAttributes: [email]
       AutoVerifiedAttributes: [email]
+      AdminCreateUserConfig:
+        AllowAdminCreateUserOnly: true     # no self-signup; users come from demo_users.py
       Schema:
         - Name: practiceId
           AttributeDataType: String
