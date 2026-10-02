@@ -14,6 +14,7 @@ journals are detected rather than duplicated; those require an explicit migratio
 import argparse
 import os
 import sys
+from pathlib import Path
 from datetime import date
 from decimal import Decimal
 
@@ -126,13 +127,18 @@ def payout_journal_lines(revenue_lines):
     return ledger.payout_lines(dollars_by_source)
 
 
+SEED_DOCS_DIR = Path(__file__).resolve().parents[2] / "seed" / "docs"
+
+
 def _source_document(practice_id, doc_id, filename, doc_type, created_at, **fields):
+    # seed-sources/, not uploads/: anything under uploads/ starts B's ingest pipeline,
+    # which would read these historical payouts again and double-post the revenue.
     return {
         "documentId": doc_id,
         "filename": filename,
         "contentType": "application/pdf",
-        "s3Key": f"uploads/{practice_id}/{doc_id}/{filename}",
-        "status": "pending_upload",
+        "s3Key": f"seed-sources/{practice_id}/{doc_id}/{filename}",
+        "status": "pending_upload",  # seed() marks it processed once the PDF is in S3
         "type": doc_type,
         "uploadedBy": "role-e-seed",
         "createdAt": created_at,
@@ -141,7 +147,7 @@ def _source_document(practice_id, doc_id, filename, doc_type, created_at, **fiel
 
 
 def source_documents(practice_id, include_sept=False):
-    """Stable document metadata for local PDFs; S3 objects are not uploaded here."""
+    """Stable document metadata for the PDFs in seed/docs (uploaded by upload_source_pdfs)."""
     documents = []
     for year, month in months(SOURCE_START, END):
         tag = month_tag(year, month)
@@ -154,6 +160,7 @@ def source_documents(practice_id, include_sept=False):
             f"lpl_payout_statement_{tag}.pdf",
             "payout_statement",
             f"{tag}-01T00:00:00+00:00",
+            vendorName="LPL Financial",
             period=tag,
             amount=total_cents / 100,
         ))
@@ -187,6 +194,7 @@ def source_documents(practice_id, include_sept=False):
             "lpl_payout_statement_sep_2026.pdf",
             "payout_statement",
             "2026-09-30T00:00:00+00:00",
+            vendorName="LPL Financial",
             period="2026-09",
             amount=205_228.00,
         ))
@@ -345,7 +353,37 @@ def _reject_legacy_split_expenses(practice_id):
             )
 
 
-def seed(practice_id, include_sept=False, live_sept=False):
+def local_pdf(filename):
+    """Seed PDFs live in seed/docs/sources, except the Sept payout in seed/docs."""
+    for folder in (SEED_DOCS_DIR / "sources", SEED_DOCS_DIR):
+        path = folder / filename
+        if path.exists():
+            return path
+    raise FileNotFoundError(f"{filename} not found under {SEED_DOCS_DIR}; run seed/generate_docs.py")
+
+
+def upload_source_pdfs(documents, bucket):
+    """Put each seed PDF at its s3Key unless it is already there (the bucket uses
+    Object Lock, so re-uploads would only stack versions)."""
+    import boto3
+    from botocore.exceptions import ClientError
+
+    s3 = boto3.client("s3")
+    uploaded = 0
+    for document in documents:
+        try:
+            s3.head_object(Bucket=bucket, Key=document["s3Key"])
+            continue
+        except ClientError as error:
+            if error.response.get("Error", {}).get("Code") not in ("404", "NoSuchKey", "NotFound"):
+                raise
+        s3.put_object(Bucket=bucket, Key=document["s3Key"], ContentType="application/pdf",
+                      Body=local_pdf(document["filename"]).read_bytes(), ChecksumAlgorithm="SHA256")
+        uploaded += 1
+    return uploaded
+
+
+def seed(practice_id, include_sept=False, live_sept=False, docs_bucket=None):
     """Write seed rows. This is only called by the --table path, never --check."""
     from shared import ddb, ledger, repo
 
@@ -359,8 +397,18 @@ def seed(practice_id, include_sept=False, live_sept=False):
         fallback_active = False
 
     sept_mode = include_sept or live_sept
-    for document in source_documents(practice_id, include_sept=fallback_active):
-        if not ddb.get_item(practice_id, f"DOC#{document['documentId']}"):
+    documents = source_documents(practice_id, include_sept=fallback_active)
+    if docs_bucket:
+        uploaded = upload_source_pdfs(documents, docs_bucket)
+        print(f"Uploaded {uploaded} source PDFs to s3://{docs_bucket}/seed-sources/ "
+              f"({len(documents) - uploaded} already there).")
+        for document in documents:
+            document["status"] = "processed"
+    for document in documents:
+        existing = ddb.get_item(practice_id, f"DOC#{document['documentId']}")
+        # Seed-owned rows: write them, repoint rows from the old uploads/ layout, and
+        # mark them processed once their PDFs are uploaded.
+        if not existing or any(existing.get(k) != document[k] for k in ("s3Key", "status")):
             ddb.put_item(practice_id, f"DOC#{document['documentId']}", document)
 
     for journal_id, entry_date, lines, memo, source_doc_id in build(
@@ -377,7 +425,9 @@ def seed(practice_id, include_sept=False, live_sept=False):
         repo.put_revenue_lines(practice_id, period, doc_id, lines)
 
     print(f"Posted history and {('fallback' if fallback_active else 'live' if live_sept else 'no')} September mode.")
-    print("Source-document S3 objects remain pending upload; local seed PDFs are not cloud files.")
+    if not docs_bucket:
+        print("No --docs-bucket given: DOC# rows written, but the PDFs were not uploaded, "
+              "so Ask citations and exports can't open them.")
 
 
 def _entries(include_sept=False, live_sept=False):
@@ -478,6 +528,8 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--table")
     parser.add_argument("--practice", default="p1")
+    parser.add_argument("--docs-bucket", default=os.environ.get("DOCS_BUCKET"),
+                        help="documents bucket (DocsBucketName output) to upload the source PDFs to")
     parser.add_argument("--check", action="store_true", help="show the numbers, write nothing")
     september = parser.add_mutually_exclusive_group()
     september.add_argument(
@@ -498,7 +550,8 @@ def main():
 
     os.environ["TABLE_NAME"] = args.table
     try:
-        seed(args.practice, include_sept=args.include_sept, live_sept=args.live_sept)
+        seed(args.practice, include_sept=args.include_sept, live_sept=args.live_sept,
+             docs_bucket=args.docs_bucket)
     except RuntimeError as error:
         parser.error(str(error))
 
