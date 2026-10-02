@@ -1,4 +1,11 @@
 .DS_Store
+node_modules/
+.next/
+out/
+.env*
+!.env.example
+*.tsbuildinfo
+.amplify/
 __pycache__/
 *.pyc
 .pytest_cache/
@@ -8,6 +15,4 @@ venv/
 samconfig.toml
 .env
 .env.*
-node_modules/
-.next/
 backend/.dev-exports/
