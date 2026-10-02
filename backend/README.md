@@ -23,7 +23,7 @@ curl -H "Authorization: Bearer $TOKEN_OWNER" "$API/bills?status=pending_approval
 ```bash
 cd backend && python -m venv .venv && source .venv/bin/activate
 pip install -r requirements-dev.txt
-pytest -q            # 19 tests: rules engine, ledger, full bill lifecycle (moto)
+pytest -q            # 20 tests: rules engine, ledger, full bill lifecycle (moto)
 cfn-lint template.yaml
 ```
 
@@ -97,7 +97,7 @@ Money in the API is **dollars**. Money in the ledger is **integer cents**.
 - **Revenue lines (D4)**: ingest (B) stores payout statement lines with `repo.put_revenue_lines(p, "2026-09", doc_id, [{"source": "trail", "ref": "4471", "label": "...", "actual": 247800}])` (`actual` in int cents; ids derived from `doc_id`, so re-ingesting overwrites). Financials reads them with `ddb.get_revenue_lines(p, "2026-09")` (also accepts `2026-Q3` / `2026`).
 - **Fee schedule**: lives on the practice META item as `feeSchedule` (amounts/aum in int cents, `annualRate` as a fraction) and comes back from `ddb.get_practice(p)`. `scripts/seed.py` writes a sample one; E may replace it.
 - **COA** is in `shared/coa.py` (your codes). `Bill.glAccount` is validated as 6xxx.
-- Add your `FinancialsFunction` to `template.yaml` the same way as `RulesFunction` (`Handler: handlers.financials.handler`, `DynamoDBReadPolicy`, `Path: /financials`). The `LedgerUpdated` event on the `ledgerline-<stage>` bus fires after every posting if you want to cache.
+- **`/financials` route**: once your code is under `src/financials/`, Jay adds `FinancialsFunction` to `template.yaml` (he owns that file, so send him anything else you need). The `LedgerUpdated` event on the `ledgerline-<stage>` bus fires after every posting if you want to cache.
 
 ## Contract for A (Frontend)
 
