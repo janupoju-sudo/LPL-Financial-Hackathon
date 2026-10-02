@@ -28,7 +28,7 @@ class Context(unittest.TestCase):
         self.assertIn("6200 Rent and occupancy", ctx["text"])
 
     def test_keyword_match(self):
-        ctx = context.build("What did Brightline charge us in September?", sample_entries(), DOCUMENTS, TODAY)
+        ctx = context.build("What did Orion Software charge us in September?", sample_entries(), DOCUMENTS, TODAY)
         self.assertEqual(context.doc_id(ctx["documents"][0]), "d1")
 
 
@@ -42,7 +42,7 @@ class Ask(unittest.TestCase):
 
         r = answer.ask("Why did my margin drop in Q3?", sample_entries(), DOCUMENTS, TODAY, fake_llm, no_guard)
         self.assertEqual([c["documentId"] for c in r["citations"]], ["rent-2026-07"])
-        self.assertEqual(r["citations"][0]["label"], "Summit Office Partners (invoice)")
+        self.assertEqual(r["citations"][0]["label"], "Seaport Office Partners (invoice)")
         self.assertIn("QUESTION\nWhy did my margin drop in Q3?", seen["user"])
 
     def test_blocked_question_skips_model(self):
