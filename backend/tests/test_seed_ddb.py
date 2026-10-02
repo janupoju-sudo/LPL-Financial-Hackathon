@@ -183,7 +183,8 @@ def test_built_journals_balance_and_source_ids_are_stable():
 
     assert all(debits == credits for debits, credits in balances.values())
     assert source_ids["j-expense-rent-2026-07"] == seed_ddb.LEASE_DOC_ID
-    assert source_ids["j-expense-compliance-2026-07"] == seed_ddb.compliance_doc_id(2026, 7)
+    assert source_ids["j-expense-compliance-base-2026-07"] is None
+    assert source_ids["j-expense-compliance-consultant-2026-07"] == seed_ddb.compliance_doc_id(2026, 7)
     assert source_ids["j-payout-2026-07"] == seed_ddb.payout_doc_id(2026, 7)
 
 def test_source_pdfs_upload_outside_the_ingest_prefix(aws):
