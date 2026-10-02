@@ -128,6 +128,33 @@ def payout_journal_lines(revenue_lines):
     return ledger.payout_lines(dollars_by_source)
 
 
+def attributed_expense_journals(tag, entry_date, rent, compliance, compliance_doc):
+    """Build balanced rent and base/consultant compliance journals separately."""
+    from shared import coa, ledger
+
+    consultant = compliance - MONTHLY_EXPENSES["6600"]
+    entries = []
+    for label, account, amount, source_doc in (
+        ("rent", "6200", rent, LEASE_DOC_ID),
+        ("compliance-base", "6600", MONTHLY_EXPENSES["6600"], None),
+        ("compliance-consultant", "6600", consultant, compliance_doc),
+    ):
+        cents = ledger.to_cents(amount)
+        entries.append((
+            f"j-expense-{label}-{tag}", entry_date,
+            [{"account": account, "debit": cents},
+             {"account": coa.ACCOUNTS_PAYABLE, "credit": cents}],
+            f"{label.replace('-', ' ').title()} expense {tag}", source_doc,
+        ))
+        entries.append((
+            f"j-expense-paid-{label}-{tag}", entry_date,
+            [{"account": coa.ACCOUNTS_PAYABLE, "debit": cents},
+             {"account": coa.CASH, "credit": cents}],
+            f"Paid {label.replace('-', ' ')} expense {tag}", source_doc,
+        ))
+    return entries
+
+
 SEED_DOCS_DIR = Path(__file__).resolve().parents[2] / "seed" / "docs"
 
 

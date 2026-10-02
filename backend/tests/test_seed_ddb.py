@@ -174,6 +174,7 @@ def test_built_journals_balance_and_source_ids_are_stable():
     journals = seed_ddb.build(include_sept=True)
     balances = defaultdict(lambda: [0, 0])
     source_ids = {journal_id: source_doc_id for journal_id, _, _, _, source_doc_id in journals}
+    journal_lines = {journal_id: lines for journal_id, _, lines, _, _ in journals}
 
     for journal_id, entry_date, lines, memo, source_doc_id in journals:
         built = ledger.build_journal(journal_id, entry_date, lines, memo, source_doc_id)
@@ -183,8 +184,31 @@ def test_built_journals_balance_and_source_ids_are_stable():
 
     assert all(debits == credits for debits, credits in balances.values())
     assert source_ids["j-expense-rent-2026-07"] == seed_ddb.LEASE_DOC_ID
-    assert source_ids["j-expense-compliance-2026-07"] == seed_ddb.compliance_doc_id(2026, 7)
+    assert source_ids["j-expense-compliance-base-2026-07"] is None
+    assert source_ids["j-expense-compliance-consultant-2026-07"] == seed_ddb.compliance_doc_id(2026, 7)
     assert source_ids["j-payout-2026-07"] == seed_ddb.payout_doc_id(2026, 7)
+
+    for month in (7, 8, 9):
+        tag = f"2026-{month:02d}"
+        base_id = f"j-expense-compliance-base-{tag}"
+        consultant_id = f"j-expense-compliance-consultant-{tag}"
+        base_payment_id = f"j-expense-paid-compliance-base-{tag}"
+        consultant_payment_id = f"j-expense-paid-compliance-consultant-{tag}"
+
+        base_amount = next(line["debit"] for line in journal_lines[base_id] if line["account"] == "6600")
+        consultant_amount = next(line["debit"] for line in journal_lines[consultant_id]
+                                 if line["account"] == "6600")
+        base_payment = next(line["debit"] for line in journal_lines[base_payment_id]
+                            if line["account"] == "2000")
+        consultant_payment = next(line["debit"] for line in journal_lines[consultant_payment_id]
+                                   if line["account"] == "2000")
+
+        assert (base_amount, consultant_amount) == (310_000, 255_000)
+        assert (base_payment, consultant_payment) == (310_000, 255_000)
+        assert source_ids[base_id] is None
+        assert source_ids[consultant_id] == seed_ddb.compliance_doc_id(2026, month)
+        assert source_ids[consultant_payment_id] == seed_ddb.compliance_doc_id(2026, month)
+
 
 def test_source_pdfs_upload_outside_the_ingest_prefix(aws):
     import boto3

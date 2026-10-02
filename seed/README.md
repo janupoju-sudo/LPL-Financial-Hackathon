@@ -20,21 +20,26 @@ The PDFs are local only. Their manifest upload status is `pending`, and the seed
 DynamoDB document records use `status=pending_upload`. No S3 objects or working
 download links exist until the team uploads these files. Supporting source PDFs
 and the fallback payout attachment use `seed-sources/<practiceId>/<documentId>/<filename>`
-so they cannot trigger ingestion. Upload these files directly to that exact key;
-do not request `/documents/upload-url`, which always creates an ingesting
-`uploads/` key. The seven workflow documents stay on the normal `uploads/` path.
+so they cannot trigger ingestion. The existing `--docs-bucket` seed uploader
+places them at those keys; do not request `/documents/upload-url`, which always
+creates an ingesting `uploads/` key. The seven workflow documents stay on the
+normal `uploads/` path.
 
-Example upload after the team confirms the target bucket and practice:
+Use the existing seed uploader after confirming the target table, practice, and
+documents bucket with the team:
 
 ```bash
-aws s3 cp seed/docs/sources/lease_amendment_effective_2026-07-01.pdf \
-	s3://<DocsBucketName>/seed-sources/p1/doc_lease_amendment_2026_07/lease_amendment_effective_2026-07-01.pdf
+cd backend
+python scripts/seed_ddb.py --table ledgerline-dev --practice p1 --docs-bucket <DocsBucketName>
 ```
 
-Use the matching `s3_key_template` in `seed/docs/manifest.json` for each file.
-The fallback payout attachment has its own `seed-sources/` mapping; the same
-September payout PDF in the seven-document live workflow set has an `uploads/`
-mapping instead.
+This command is not upload-only: it also writes the idempotent history and
+supporting DOC# rows. Add `--live-sept` to seed September baseline expenses for
+the live demo, leaving payout ingestion empty. Use `--include-sept` instead only
+if live payout ingestion failed and no successful September payout already
+exists; these September modes are mutually exclusive. The fallback payout PDF
+uses its own `seed-sources/` key, while the same PDF in the seven-document live
+workflow pack remains mapped to `uploads/` for ingestion.
 
 ## B8 checklist
 
