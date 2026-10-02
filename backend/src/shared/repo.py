@@ -193,6 +193,38 @@ def bill_summary(bill: dict) -> dict:
     return from_ddb({k: bill.get(k) for k in keys if k in bill})
 
 
+# ---------- revenue lines (payout statements) ----------
+
+REVENUE_SOURCES = ("advisory", "commission", "trail", "other")
+
+
+def put_revenue_lines(practice_id, period: str, doc_id: str, lines: list) -> list:
+    """Store payout statement lines for reconciliation (Financials / D4). Written by ingest (B).
+
+    period: 'YYYY-MM' the statement covers.
+    lines:  [{"source": "trail", "ref": "4471", "label": "VA trail 4471", "actual": 247800}, ...]
+            actual is INTEGER CENTS. Ids are derived from doc_id, so re-running ingest overwrites
+            instead of duplicating.
+    """
+    if len(period) != 7 or period[4] != "-":
+        raise ValueError("period must be YYYY-MM")
+    stored = []
+    for n, line in enumerate(lines, start=1):
+        if line.get("source") not in REVENUE_SOURCES:
+            raise ValueError(f"source must be one of {', '.join(REVENUE_SOURCES)}")
+        actual = line.get("actual")
+        if not isinstance(actual, int) or isinstance(actual, bool):
+            raise ValueError("actual must be integer cents")
+        item = {
+            "id": line.get("id") or f"{doc_id}-{n:02d}", "period": period, "source": line["source"],
+            "ref": line.get("ref"), "label": line.get("label") or line["source"].title(),
+            "actual": actual, "docId": doc_id, "createdAt": now_iso(),
+        }
+        put_item(practice_id, f"REV#{period}#{item['id']}", item)
+        stored.append(item)
+    return stored
+
+
 # ---------- rules ----------
 
 def list_rules(practice_id, seed_defaults=True):

@@ -54,3 +54,29 @@ def test_get_practice(aws):
     ddb.put_item("p1", "META", {"name": "Harbor Point Wealth", "clientCount": 180, "top10Share": 0.22})
     p = ddb.get_practice("p1")
     assert p["clientCount"] == 180 and p["top10Share"] == 0.22 and "PK" not in p
+
+
+def test_revenue_lines_and_practice_meta(aws):
+    from shared import ddb, repo
+    ddb.put_item("p1", "META", {"clientCount": 180, "top10Share": 0.22, "feeSchedule": [
+        {"id": "va-4471", "source": "trail", "ref": "4471", "basis": "aum",
+         "aum": 115600000, "annualRate": 0.01, "frequency": "quarterly"}]})
+    meta = ddb.get_practice("p1")
+    item = meta["feeSchedule"][0]
+    assert meta["clientCount"] == 180 and meta["top10Share"] == 0.22
+    assert item["aum"] == 115600000 and isinstance(item["aum"], int) and item["annualRate"] == 0.01
+
+    repo.put_revenue_lines("p1", "2026-09", "d3", [
+        {"source": "advisory", "label": "Advisory fees", "actual": 18240000},
+        {"source": "trail", "ref": "4471", "label": "VA trail 4471", "actual": 247800}])
+    repo.put_revenue_lines("p1", "2026-08", "d2", [{"source": "advisory", "actual": 18240000}])
+    repo.put_revenue_lines("p1", "2026-09", "d3", [   # re-ingest overwrites, no duplicates
+        {"source": "advisory", "label": "Advisory fees", "actual": 18240000},
+        {"source": "trail", "ref": "4471", "label": "VA trail 4471", "actual": 247800}])
+
+    sep = ddb.get_revenue_lines("p1", "2026-09")
+    assert [(l["id"], l["actual"], l["docId"]) for l in sep] == [("d3-01", 18240000, "d3"), ("d3-02", 247800, "d3")]
+    assert all(isinstance(l["actual"], int) for l in sep)
+    assert len(ddb.get_revenue_lines("p1", "2026-Q3")) == 3
+    with pytest.raises(ValueError):
+        repo.put_revenue_lines("p1", "2026-09", "d4", [{"source": "trail", "actual": 2478.00}])

@@ -174,6 +174,34 @@ def get_ledger_entries(practice_id: str, start_date: str, end_date: str) -> list
 
 
 def get_practice(practice_id: str):
-    """PRACTICE#<id> / META item (name, aum, clientCount, top10Share, ...), Decimals converted."""
+    """PRACTICE#<id> / META item, Decimals converted (whole numbers -> int, rates -> float).
+
+    Fields read by Financials (D): clientCount, top10Share, feeSchedule (list; amounts and aum
+    in integer cents, annualRate as a fraction e.g. 0.01). META.aum is in dollars.
+    """
     item = get_item(practice_id, "META")
     return public(item) if item else None
+
+
+def _months_in(period: str) -> list:
+    """'2026-09' -> ['2026-09'];  '2026-Q3' -> ['2026-07','2026-08','2026-09'];  '2026' -> 12 months."""
+    period = period.strip().upper()
+    if len(period) == 7 and period[4] == "-" and period[5] != "Q":
+        return [period]
+    if len(period) == 7 and period[5] == "Q" and period[6] in "1234":
+        q = int(period[6])
+        return [f"{period[:4]}-{m:02d}" for m in range(3 * q - 2, 3 * q + 1)]
+    if len(period) == 4 and period.isdigit():
+        return [f"{period}-{m:02d}" for m in range(1, 13)]
+    raise ValueError(f"Unrecognized period {period!r}; use YYYY-MM, YYYY-Qn or YYYY")
+
+
+def get_revenue_lines(practice_id: str, period: str) -> list:
+    """RevenueLine items (SK REV#<yyyy-mm>#<id>) for a month; also accepts YYYY-Qn or YYYY.
+
+    Each line: {"id", "period", "source", "ref", "label", "actual" (int cents), "docId", ...}
+    """
+    lines = []
+    for month in _months_in(period):
+        lines.extend(public(i) for i in query_prefix(practice_id, f"REV#{month}#"))
+    return sorted(lines, key=lambda l: (l.get("period", ""), l.get("id", "")))

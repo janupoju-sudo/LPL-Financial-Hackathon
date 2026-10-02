@@ -23,6 +23,18 @@ def main():
     ddb.put_item(p, "META", {
         "practiceId": p, "name": "Harbor Point Wealth (FICTIONAL)", "owner": "Maya Chen",
         "aum": 250_000_000, "clientCount": 180, "top10Share": 0.22, "staffCount": 4,
+        # Expected revenue for reconciliation (D4). Amounts/aum in integer cents. E may replace.
+        "feeSchedule": [
+            {"id": "adv", "label": "Advisory fees", "source": "advisory",
+             "basis": "fixed", "amount": 182_400_00, "frequency": "monthly"},
+            {"id": "mf-comm", "label": "Mutual fund commissions", "source": "commission",
+             "basis": "fixed", "amount": 14_200_00, "frequency": "monthly"},
+            {"id": "12b1", "label": "12b-1 trails", "source": "trail", "ref": "12b1",
+             "basis": "fixed", "amount": 6_150_00, "frequency": "monthly"},
+            {"id": "va-4471", "label": "Variable annuity trail, contract ...4471", "source": "trail",
+             "ref": "4471", "basis": "aum", "aum": 1_156_000_00, "annualRate": 0.01,
+             "frequency": "quarterly", "billingMonths": [3, 6, 9, 12]},
+        ],
     })
     repo.list_rules(p)  # writes DEFAULT_RULES if none exist
     vendors = [

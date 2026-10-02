@@ -94,6 +94,8 @@ Money in the API is **dollars**. Money in the ledger is **integer cents**.
 - **Read**: `ddb.get_ledger_entries(practice_id, start_date, end_date)` returns lines with int cents, sorted. `ddb.get_practice(practice_id)` returns META with `clientCount`, `top10Share`, `aum`, `name` (seeded by `scripts/seed.py`).
 - **What the workflow posts**: bill approved `j-<billId>-accrual` (Dr `glAccount` / Cr 2000); mock payment `j-<billId>-payment` (Dr 2000 / Cr 1000). `sourceDocId` = the bill's documentId.
 - **Payouts**: `ledger.post_journal(p, f"j-payout-{doc_id}", date, ledger.payout_lines({"advisory": 41000, "commission": 3200.5, "trail": 1875.25}), memo, source_doc_id=doc_id)`. Card spend: `ledger.card_spend_lines(amount, "6700")`.
+- **Revenue lines (D4)**: ingest (B) stores payout statement lines with `repo.put_revenue_lines(p, "2026-09", doc_id, [{"source": "trail", "ref": "4471", "label": "...", "actual": 247800}])` (`actual` in int cents; ids derived from `doc_id`, so re-ingesting overwrites). Financials reads them with `ddb.get_revenue_lines(p, "2026-09")` (also accepts `2026-Q3` / `2026`).
+- **Fee schedule**: lives on the practice META item as `feeSchedule` (amounts/aum in int cents, `annualRate` as a fraction) and comes back from `ddb.get_practice(p)`. `scripts/seed.py` writes a sample one; E may replace it.
 - **COA** is in `shared/coa.py` (your codes). `Bill.glAccount` is validated as 6xxx.
 - Add your `FinancialsFunction` to `template.yaml` the same way as `RulesFunction` (`Handler: handlers.financials.handler`, `DynamoDBReadPolicy`, `Path: /financials`). The `LedgerUpdated` event on the `ledgerline-<stage>` bus fires after every posting if you want to cache.
 
