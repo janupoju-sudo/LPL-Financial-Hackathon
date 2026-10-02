@@ -12,14 +12,16 @@
 | Finalize vendor docs/payout or bill | `ingest.route.handler` |
 | Mark a failed document for review | `ingest.failure.handler` |
 
-Set `BEDROCK_MODEL_ID` to an enabled model approved for the hackathon account. The
-provided service list allows Claude Opus 5, but does not list Claude Opus 5.5; do not
-hardcode an unapproved model ID. The extractor Lambda needs a timeout long enough to
-poll Textract asynchronous jobs (up to 15 minutes).
+`ClassifyFunction` and `NormalizeFunction` use `IngestModelId` when it is set, and
+otherwise fall back to `BedrockModelId`. `AskFunction` continues to use
+`BedrockModelId`. For the current deployment, the infra owner plans to set
+`IngestModelId=us.anthropic.claude-sonnet-5`; confirm that profile is enabled in the
+account before deploying. The extractor Lambda needs a timeout long enough to poll
+Textract asynchronous jobs (up to 15 minutes).
 
-`backend/template.yaml` now contains the B functions, policies, model-ID parameter,
-Step Functions integration, and upload trigger. D's Ask function uses the same
-`BedrockModelId` parameter; neither path contains a default model ID.
+`backend/template.yaml` contains the B functions, policies, model-ID parameters,
+Step Functions integration, and upload trigger. `IngestModelId` is optional and has
+an empty default; `BedrockModelId` remains required for Ask.
 
 The S3 EventBridge rule matches only `uploads/` keys; Textract results are written
 under `processing/` to avoid retriggering ingest. Step Functions invokes the

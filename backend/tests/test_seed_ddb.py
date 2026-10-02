@@ -183,25 +183,24 @@ def test_built_journals_balance_and_source_ids_are_stable():
 
     assert all(debits == credits for debits, credits in balances.values())
     assert source_ids["j-expense-rent-2026-07"] == seed_ddb.LEASE_DOC_ID
-    assert source_ids["j-expense-compliance-base-2026-07"] is None
-    assert source_ids["j-expense-compliance-consultant-2026-07"] == seed_ddb.compliance_doc_id(2026, 7)
+    assert source_ids["j-expense-compliance-2026-07"] == seed_ddb.compliance_doc_id(2026, 7)
     assert source_ids["j-payout-2026-07"] == seed_ddb.payout_doc_id(2026, 7)
 
-    journal_lines = defaultdict(list)
-    for journal_id, _, lines, _, _ in journals:
-        journal_lines[journal_id] = lines
-    for month in (7, 8, 9):
-        tag = f"2026-{month:02d}"
-        base_id = f"j-expense-compliance-base-{tag}"
-        consultant_id = f"j-expense-compliance-consultant-{tag}"
-        base_amount = next(line["debit"] for line in journal_lines[base_id] if line["account"] == "6600")
-        consultant_amount = next(line["debit"] for line in journal_lines[consultant_id]
-                                 if line["account"] == "6600")
-        base_payment = next(line["debit"] for line in journal_lines[f"j-expense-paid-compliance-base-{tag}"]
-                            if line["account"] == "2000")
-        consultant_payment = next(
-            line["debit"] for line in journal_lines[f"j-expense-paid-compliance-consultant-{tag}"]
-            if line["account"] == "2000"
-        )
-        assert (base_amount, consultant_amount) == (310_000, 255_000)
-        assert (base_payment, consultant_payment) == (310_000, 255_000)
+def test_source_pdfs_upload_outside_the_ingest_prefix(aws):
+    import boto3
+
+    s3 = boto3.client("s3")
+    s3.create_bucket(Bucket="seed-docs-test")
+    seed_ddb.seed("p1", live_sept=True, docs_bucket="seed-docs-test")
+    keys = [o["Key"] for o in s3.list_objects_v2(Bucket="seed-docs-test")["Contents"]]
+    docs = seed_ddb.source_documents("p1")
+
+    assert len(keys) == len(docs)
+    assert all(k.startswith("seed-sources/p1/") for k in keys)  # never uploads/ (ingest trigger)
+    lease = repo.get_document("p1", seed_ddb.LEASE_DOC_ID)
+    assert lease["status"] == "processed" and lease["s3Key"] in keys
+    payout = repo.get_document("p1", seed_ddb.payout_doc_id(2026, 8))
+    assert payout["vendorName"] == "LPL Financial"
+
+    seed_ddb.seed("p1", live_sept=True, docs_bucket="seed-docs-test")  # re-run uploads nothing new
+    assert len(s3.list_objects_v2(Bucket="seed-docs-test")["Contents"]) == len(docs)
