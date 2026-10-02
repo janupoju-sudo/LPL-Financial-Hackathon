@@ -8,14 +8,20 @@ Serverless on AWS: **API Gateway (HTTP API) + Lambda (Python 3.12) + DynamoDB + 
 brew install aws-sam-cli awscli        # once
 aws configure                          # region us-east-1
 cd backend
-sam build && sam deploy --guided       # first time; stack name ledgerline-dev; accept defaults
+sam build && sam deploy --guided       # first time; stack name ledgerline-dev
 # sam build needs Python 3.12 on your Mac (brew install python@3.12) because src/requirements.txt
 # installs the anthropic SDK; or use `sam build --use-container` with Docker running.
-# Before testing /ask: Bedrock console -> Model access -> enable the model in ASK_MODEL_ID.
+# When prompted for BedrockModelId, enter the exact model ID enabled for this account.
+# Do not accept a default: the parameter is required for Ask and document classification.
 python scripts/seed.py --table ledgerline-dev
 python scripts/demo_users.py --user-pool-id <UserPoolId> --client-id <UserPoolClientId>
 ```
-Stack outputs give you `ApiUrl`, `UserPoolId`, `UserPoolClientId`, `DocsBucketName`, `CreateBillFunctionArn`.
+Stack outputs give you `ApiUrl`, `UserPoolId`, `UserPoolClientId`, `DocsBucketName`,
+`CreateBillFunctionArn`, and `IngestDocumentStateMachineArn`.
+
+The template includes B's ingest Lambda functions and upload EventBridge trigger. The
+trigger starts the ingest state machine for new objects under `uploads/`; it does not
+run for processing results written under `processing/`.
 
 ```bash
 curl -H "Authorization: Bearer $TOKEN_OWNER" "$API/bills?status=pending_approval"

@@ -12,7 +12,9 @@ def _document_fields(event: Mapping[str, Any]) -> tuple[dict[str, str], dict[str
     return upload, normalized
 
 
-def prepare_bill(event: Mapping[str, Any]) -> dict[str, Any]:
+def prepare_bill(
+    event: Mapping[str, Any], context: Any = None
+) -> dict[str, Any]:
     upload, normalized = _document_fields(event)
     vendor = event.get("vendorMatch", {}).get("data", {}).get("vendor")
     request: dict[str, Any] = {
