@@ -9,7 +9,7 @@
       "document_type": "payout_statement",
       "period": "2025-09",
       "amount_dollars": 205640,
-      "s3_key_template": "uploads/{practiceId}/doc_lpl_payout_2025_09/lpl_payout_statement_2025-09.pdf",
+      "s3_key_template": "seed-sources/{practiceId}/doc_lpl_payout_2025_09/lpl_payout_statement_2025-09.pdf",
       "upload_status": "pending"
     },
     {
@@ -19,7 +19,7 @@
       "document_type": "payout_statement",
       "period": "2025-10",
       "amount_dollars": 202750,
-      "s3_key_template": "uploads/{practiceId}/doc_lpl_payout_2025_10/lpl_payout_statement_2025-10.pdf",
+      "s3_key_template": "seed-sources/{practiceId}/doc_lpl_payout_2025_10/lpl_payout_statement_2025-10.pdf",
       "upload_status": "pending"
     },
     {
@@ -29,7 +29,7 @@
       "document_type": "payout_statement",
       "period": "2025-11",
       "amount_dollars": 202750,
-      "s3_key_template": "uploads/{practiceId}/doc_lpl_payout_2025_11/lpl_payout_statement_2025-11.pdf",
+      "s3_key_template": "seed-sources/{practiceId}/doc_lpl_payout_2025_11/lpl_payout_statement_2025-11.pdf",
       "upload_status": "pending"
     },
     {
@@ -39,7 +39,7 @@
       "document_type": "payout_statement",
       "period": "2025-12",
       "amount_dollars": 205640,
-      "s3_key_template": "uploads/{practiceId}/doc_lpl_payout_2025_12/lpl_payout_statement_2025-12.pdf",
+      "s3_key_template": "seed-sources/{practiceId}/doc_lpl_payout_2025_12/lpl_payout_statement_2025-12.pdf",
       "upload_status": "pending"
     },
     {
@@ -49,7 +49,7 @@
       "document_type": "payout_statement",
       "period": "2026-01",
       "amount_dollars": 202750,
-      "s3_key_template": "uploads/{practiceId}/doc_lpl_payout_2026_01/lpl_payout_statement_2026-01.pdf",
+      "s3_key_template": "seed-sources/{practiceId}/doc_lpl_payout_2026_01/lpl_payout_statement_2026-01.pdf",
       "upload_status": "pending"
     },
     {
@@ -59,7 +59,7 @@
       "document_type": "payout_statement",
       "period": "2026-02",
       "amount_dollars": 202750,
-      "s3_key_template": "uploads/{practiceId}/doc_lpl_payout_2026_02/lpl_payout_statement_2026-02.pdf",
+      "s3_key_template": "seed-sources/{practiceId}/doc_lpl_payout_2026_02/lpl_payout_statement_2026-02.pdf",
       "upload_status": "pending"
     },
     {
@@ -69,7 +69,7 @@
       "document_type": "payout_statement",
       "period": "2026-03",
       "amount_dollars": 205640,
-      "s3_key_template": "uploads/{practiceId}/doc_lpl_payout_2026_03/lpl_payout_statement_2026-03.pdf",
+      "s3_key_template": "seed-sources/{practiceId}/doc_lpl_payout_2026_03/lpl_payout_statement_2026-03.pdf",
       "upload_status": "pending"
     },
     {
@@ -79,7 +79,7 @@
       "document_type": "payout_statement",
       "period": "2026-04",
       "amount_dollars": 202750,
-      "s3_key_template": "uploads/{practiceId}/doc_lpl_payout_2026_04/lpl_payout_statement_2026-04.pdf",
+      "s3_key_template": "seed-sources/{practiceId}/doc_lpl_payout_2026_04/lpl_payout_statement_2026-04.pdf",
       "upload_status": "pending"
     },
     {
@@ -89,7 +89,7 @@
       "document_type": "payout_statement",
       "period": "2026-05",
       "amount_dollars": 202750,
-      "s3_key_template": "uploads/{practiceId}/doc_lpl_payout_2026_05/lpl_payout_statement_2026-05.pdf",
+      "s3_key_template": "seed-sources/{practiceId}/doc_lpl_payout_2026_05/lpl_payout_statement_2026-05.pdf",
       "upload_status": "pending"
     },
     {
@@ -99,7 +99,7 @@
       "document_type": "payout_statement",
       "period": "2026-06",
       "amount_dollars": 205640,
-      "s3_key_template": "uploads/{practiceId}/doc_lpl_payout_2026_06/lpl_payout_statement_2026-06.pdf",
+      "s3_key_template": "seed-sources/{practiceId}/doc_lpl_payout_2026_06/lpl_payout_statement_2026-06.pdf",
       "upload_status": "pending"
     },
     {
@@ -109,7 +109,7 @@
       "document_type": "payout_statement",
       "period": "2026-07",
       "amount_dollars": 202750,
-      "s3_key_template": "uploads/{practiceId}/doc_lpl_payout_2026_07/lpl_payout_statement_2026-07.pdf",
+      "s3_key_template": "seed-sources/{practiceId}/doc_lpl_payout_2026_07/lpl_payout_statement_2026-07.pdf",
       "upload_status": "pending"
     },
     {
@@ -119,7 +119,7 @@
       "document_type": "payout_statement",
       "period": "2026-08",
       "amount_dollars": 202750,
-      "s3_key_template": "uploads/{practiceId}/doc_lpl_payout_2026_08/lpl_payout_statement_2026-08.pdf",
+      "s3_key_template": "seed-sources/{practiceId}/doc_lpl_payout_2026_08/lpl_payout_statement_2026-08.pdf",
       "upload_status": "pending"
     },
     {
@@ -132,7 +132,7 @@
       "previous_monthly_rent_dollars": 9800,
       "monthly_rent_dollars": 12200,
       "expense_account": "6200",
-      "s3_key_template": "uploads/{practiceId}/doc_lease_amendment_2026_07/lease_amendment_effective_2026-07-01.pdf",
+      "s3_key_template": "seed-sources/{practiceId}/doc_lease_amendment_2026_07/lease_amendment_effective_2026-07-01.pdf",
       "upload_status": "pending"
     },
     {
@@ -145,7 +145,7 @@
       "invoice_date": "2026-07-05",
       "amount_dollars": 2550,
       "expense_account": "6600",
-      "s3_key_template": "uploads/{practiceId}/doc_compliance_invoice_2026_07/compliance_consultant_invoice_2026-07.pdf",
+      "s3_key_template": "seed-sources/{practiceId}/doc_compliance_invoice_2026_07/compliance_consultant_invoice_2026-07.pdf",
       "upload_status": "pending"
     },
     {
@@ -158,7 +158,7 @@
       "invoice_date": "2026-08-05",
       "amount_dollars": 2550,
       "expense_account": "6600",
-      "s3_key_template": "uploads/{practiceId}/doc_compliance_invoice_2026_08/compliance_consultant_invoice_2026-08.pdf",
+      "s3_key_template": "seed-sources/{practiceId}/doc_compliance_invoice_2026_08/compliance_consultant_invoice_2026-08.pdf",
       "upload_status": "pending"
     },
     {
@@ -171,7 +171,17 @@
       "invoice_date": "2026-09-05",
       "amount_dollars": 2550,
       "expense_account": "6600",
-      "s3_key_template": "uploads/{practiceId}/doc_compliance_invoice_2026_09/compliance_consultant_invoice_2026-09.pdf",
+      "s3_key_template": "seed-sources/{practiceId}/doc_compliance_invoice_2026_09/compliance_consultant_invoice_2026-09.pdf",
+      "upload_status": "pending"
+    },
+    {
+      "document_id": "doc_lpl_payout_statement_sep_2026_fallback",
+      "filename": "lpl_payout_statement_sep_2026.pdf",
+      "local_path": "lpl_payout_statement_sep_2026.pdf",
+      "document_type": "payout_statement_fallback",
+      "period": "2026-09",
+      "amount_dollars": 205228,
+      "s3_key_template": "seed-sources/{practiceId}/doc_lpl_payout_statement_sep_2026_fallback/lpl_payout_statement_sep_2026.pdf",
       "upload_status": "pending"
     }
   ],
@@ -179,6 +189,7 @@
     {
       "filename": "orion_invoice_450_2026-09-02.pdf",
       "document_type": "invoice",
+      "s3_key_template": "uploads/{practiceId}/{documentId}/{filename}",
       "vendor_name": "Orion Software LLC",
       "expected_fields": {
         "vendor_name": "Orion Software LLC",
@@ -197,6 +208,7 @@
     {
       "filename": "orion_invoice_1850_2026-09-12.pdf",
       "document_type": "invoice",
+      "s3_key_template": "uploads/{practiceId}/{documentId}/{filename}",
       "vendor_name": "Orion Software LLC",
       "expected_fields": {
         "vendor_name": "Orion Software LLC",
@@ -219,6 +231,7 @@
     {
       "filename": "brightline_invoice_650_2026-09-18.pdf",
       "document_type": "invoice",
+      "s3_key_template": "uploads/{practiceId}/{documentId}/{filename}",
       "vendor_name": "Brightline Marketing",
       "expected_fields": {
         "vendor_name": "Brightline Marketing",
@@ -241,6 +254,7 @@
     {
       "filename": "brightline_w9.pdf",
       "document_type": "w9",
+      "s3_key_template": "uploads/{practiceId}/{documentId}/{filename}",
       "vendor_name": "Brightline Marketing",
       "expected_fields": {
         "vendor_name": "Brightline Marketing",
@@ -256,6 +270,7 @@
     {
       "filename": "brightline_void_check.pdf",
       "document_type": "void_check",
+      "s3_key_template": "uploads/{practiceId}/{documentId}/{filename}",
       "vendor_name": "Brightline Marketing",
       "expected_fields": {
         "vendor_name": "Brightline Marketing",
@@ -271,6 +286,7 @@
     {
       "filename": "receipt_scanned_2026-09-22.pdf",
       "document_type": "receipt",
+      "s3_key_template": "uploads/{practiceId}/{documentId}/{filename}",
       "vendor_name": "Riverside Cafe",
       "expected_fields": {
         "merchant": "Riverside Cafe",

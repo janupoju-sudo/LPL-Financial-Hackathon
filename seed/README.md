@@ -18,9 +18,23 @@ statements.
 
 The PDFs are local only. Their manifest upload status is `pending`, and the seeded
 DynamoDB document records use `status=pending_upload`. No S3 objects or working
-download links exist until the team uploads these files. Planned keys follow
-`uploads/<practiceId>/<documentId>/<filename>`; for example:
-`uploads/p1/doc_lease_amendment_2026_07/lease_amendment_effective_2026-07-01.pdf`.
+download links exist until the team uploads these files. Supporting source PDFs
+and the fallback payout attachment use `seed-sources/<practiceId>/<documentId>/<filename>`
+so they cannot trigger ingestion. Upload these files directly to that exact key;
+do not request `/documents/upload-url`, which always creates an ingesting
+`uploads/` key. The seven workflow documents stay on the normal `uploads/` path.
+
+Example upload after the team confirms the target bucket and practice:
+
+```bash
+aws s3 cp seed/docs/sources/lease_amendment_effective_2026-07-01.pdf \
+	s3://<DocsBucketName>/seed-sources/p1/doc_lease_amendment_2026_07/lease_amendment_effective_2026-07-01.pdf
+```
+
+Use the matching `s3_key_template` in `seed/docs/manifest.json` for each file.
+The fallback payout attachment has its own `seed-sources/` mapping; the same
+September payout PDF in the seven-document live workflow set has an `uploads/`
+mapping instead.
 
 ## B8 checklist
 

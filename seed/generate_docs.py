@@ -18,6 +18,7 @@ from reportlab.lib.units import inch
 from reportlab.pdfgen import canvas
 
 WATERMARK_TEXT = "SAMPLE — FICTIONAL DATA"
+SEEDED_SOURCE_PREFIX = "seed-sources"
 
 
 def add_watermark(pdf) -> None:
@@ -382,6 +383,7 @@ def build_manifest(output_dir: Path) -> dict:
             {
                 "filename": "orion_invoice_450_2026-09-02.pdf",
                 "document_type": "invoice",
+                "s3_key_template": "uploads/{practiceId}/{documentId}/{filename}",
                 "vendor_name": "Orion Software LLC",
                 "expected_fields": {
                     "vendor_name": "Orion Software LLC",
@@ -400,6 +402,7 @@ def build_manifest(output_dir: Path) -> dict:
             {
                 "filename": "orion_invoice_1850_2026-09-12.pdf",
                 "document_type": "invoice",
+                "s3_key_template": "uploads/{practiceId}/{documentId}/{filename}",
                 "vendor_name": "Orion Software LLC",
                 "expected_fields": {
                     "vendor_name": "Orion Software LLC",
@@ -419,6 +422,7 @@ def build_manifest(output_dir: Path) -> dict:
             {
                 "filename": "brightline_invoice_650_2026-09-18.pdf",
                 "document_type": "invoice",
+                "s3_key_template": "uploads/{practiceId}/{documentId}/{filename}",
                 "vendor_name": "Brightline Marketing",
                 "expected_fields": {
                     "vendor_name": "Brightline Marketing",
@@ -438,6 +442,7 @@ def build_manifest(output_dir: Path) -> dict:
             {
                 "filename": "brightline_w9.pdf",
                 "document_type": "w9",
+                "s3_key_template": "uploads/{practiceId}/{documentId}/{filename}",
                 "vendor_name": "Brightline Marketing",
                 "expected_fields": {
                     "vendor_name": "Brightline Marketing",
@@ -453,6 +458,7 @@ def build_manifest(output_dir: Path) -> dict:
             {
                 "filename": "brightline_void_check.pdf",
                 "document_type": "void_check",
+                "s3_key_template": "uploads/{practiceId}/{documentId}/{filename}",
                 "vendor_name": "Brightline Marketing",
                 "expected_fields": {
                     "vendor_name": "Brightline Marketing",
@@ -468,6 +474,7 @@ def build_manifest(output_dir: Path) -> dict:
             {
                 "filename": "receipt_scanned_2026-09-22.pdf",
                 "document_type": "receipt",
+                "s3_key_template": "uploads/{practiceId}/{documentId}/{filename}",
                 "vendor_name": "Riverside Cafe",
                 "expected_fields": {
                     "merchant": "Riverside Cafe",
@@ -526,7 +533,7 @@ def source_document_manifest() -> list[dict[str, object]]:
             "document_type": "payout_statement",
             "period": tag,
             "amount_dollars": total_paid,
-            "s3_key_template": f"uploads/{{practiceId}}/{doc_id}/{filename}",
+            "s3_key_template": f"{SEEDED_SOURCE_PREFIX}/{{practiceId}}/{doc_id}/{filename}",
             "upload_status": "pending",
         })
 
@@ -542,7 +549,7 @@ def source_document_manifest() -> list[dict[str, object]]:
         "previous_monthly_rent_dollars": 9_800,
         "monthly_rent_dollars": 12_200,
         "expense_account": "6200",
-        "s3_key_template": f"uploads/{{practiceId}}/{lease_id}/{lease_filename}",
+        "s3_key_template": f"{SEEDED_SOURCE_PREFIX}/{{practiceId}}/{lease_id}/{lease_filename}",
         "upload_status": "pending",
     })
 
@@ -560,9 +567,22 @@ def source_document_manifest() -> list[dict[str, object]]:
             "invoice_date": f"{tag}-05",
             "amount_dollars": 2_550,
             "expense_account": "6600",
-            "s3_key_template": f"uploads/{{practiceId}}/{doc_id}/{filename}",
+            "s3_key_template": f"{SEEDED_SOURCE_PREFIX}/{{practiceId}}/{doc_id}/{filename}",
             "upload_status": "pending",
         })
+
+    fallback_id = "doc_lpl_payout_statement_sep_2026_fallback"
+    fallback_filename = "lpl_payout_statement_sep_2026.pdf"
+    documents.append({
+        "document_id": fallback_id,
+        "filename": fallback_filename,
+        "local_path": fallback_filename,
+        "document_type": "payout_statement_fallback",
+        "period": "2026-09",
+        "amount_dollars": 205_228,
+        "s3_key_template": f"{SEEDED_SOURCE_PREFIX}/{{practiceId}}/{fallback_id}/{fallback_filename}",
+        "upload_status": "pending",
+    })
 
     return documents
 
