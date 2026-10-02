@@ -86,3 +86,14 @@ html[data-theme="dark"] :is(.pill.scheduled, .pill.processed, .pill.ok, .pill.re
 html[data-theme="dark"] .text-red { color: #ecad9b !important; }html[data-theme="dark"] .text-green { color: #a0d7ac; }html[data-theme="dark"] .rule-hit { color: #d9bd83; }
 html[data-theme="dark"] .skeleton { background: linear-gradient(90deg, #1b2821, #26372c, #1b2821); background-size: 200% 100%; }
 @media (max-width: 680px) { .topbar-right .profile-trigger .small { display: grid; } }
+
+.documents-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.documents-tabs { margin: 0; gap: 24px; border-bottom-color: var(--border); flex-wrap: wrap; }
+.documents-tabs button { font-size: 12px; padding: 14px 0; }
+.documents-upload-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.documents-upload-heading h2 { font-size: 15px; }
+.documents-upload-heading button { padding: 6px; }
+.documents-upload .dropzone { margin-top: 12px; }
+.documents-tabs + .vendor-panel { margin-top: 22px; }
+
+.filters .search-field { min-width: 180px; }
