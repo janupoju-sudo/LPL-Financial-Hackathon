@@ -16,30 +16,32 @@ manifest records stable document IDs and planned S3 keys for the lease amendment
 July-September compliance invoices, and September 2025-August 2026 payout
 statements.
 
-The PDFs are local only. Their manifest upload status is `pending`, and the seeded
-DynamoDB document records use `status=pending_upload`. No S3 objects or working
-download links exist until the team uploads these files. Supporting source PDFs
-and the fallback payout attachment use `seed-sources/<practiceId>/<documentId>/<filename>`
-so they cannot trigger ingestion. The existing `--docs-bucket` seed uploader
-places them at those keys; do not request `/documents/upload-url`, which always
-creates an ingesting `uploads/` key. The seven workflow documents stay on the
-normal `uploads/` path.
+Supporting source PDFs and the fallback payout attachment use
+`seed-sources/<practiceId>/<documentId>/<filename>`, outside the ingest trigger.
+The seven live workflow documents retain their normal `uploads/` paths. Do not
+upload supporting PDFs through `/documents/upload-url`: it always creates an
+`uploads/` key, which starts ingestion.
 
-Use the existing seed uploader after confirming the target table, practice, and
-documents bucket with the team:
+The seed owner uploads supporting PDFs with the uploader merged in PR #27:
 
 ```bash
 cd backend
-python scripts/seed_ddb.py --table ledgerline-dev --practice p1 --docs-bucket <DocsBucketName>
+python scripts/seed_ddb.py --table ledgerline-dev --practice p1 --live-sept --docs-bucket <DocsBucketName>
 ```
 
-This command is not upload-only: it also writes the idempotent history and
-supporting DOC# rows. Add `--live-sept` to seed September baseline expenses for
-the live demo, leaving payout ingestion empty. Use `--include-sept` instead only
-if live payout ingestion failed and no successful September payout already
-exists; these September modes are mutually exclusive. The fallback payout PDF
-uses its own `seed-sources/` key, while the same PDF in the seven-document live
-workflow pack remains mapped to `uploads/` for ingestion.
+This command is not upload-only: it also writes the idempotent history and the
+supporting DOC# rows. `--live-sept` seeds September baseline expenses and leaves
+the payout for live ingestion. Use `--include-sept` instead only if live payout
+ingestion failed and no successful September payout already exists; the two
+September modes are mutually exclusive.
+
+Use this only after the live-table compliance migration described in the backend
+README. The uploader checks existing objects, uploads missing PDFs and marks
+matching DOC records `processed`. Without a documents bucket, files remain local
+and the source records are `pending_upload`. A raw `aws s3 cp` does not perform
+those metadata updates. The seed owner coordinates this live operation; Advika
+must not run a competing seed or upload. Object Lock retention for seeded source
+keys must be verified by the upload/deployment owner before claiming protection.
 
 ## B8 checklist
 

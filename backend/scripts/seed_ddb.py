@@ -128,6 +128,9 @@ def payout_journal_lines(revenue_lines):
     return ledger.payout_lines(dollars_by_source)
 
 
+SEED_DOCS_DIR = Path(__file__).resolve().parents[2] / "seed" / "docs"
+
+
 def attributed_expense_journals(tag, entry_date, rent, compliance, compliance_doc):
     """Build balanced rent and base/consultant compliance journals separately."""
     from shared import coa, ledger
@@ -153,9 +156,6 @@ def attributed_expense_journals(tag, entry_date, rent, compliance, compliance_do
             f"Paid {label.replace('-', ' ')} expense {tag}", source_doc,
         ))
     return entries
-
-
-SEED_DOCS_DIR = Path(__file__).resolve().parents[2] / "seed" / "docs"
 
 
 def _source_document(practice_id, doc_id, filename, doc_type, created_at, **fields):
