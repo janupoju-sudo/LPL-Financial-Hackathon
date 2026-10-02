@@ -1,0 +1,50 @@
+{
+  "expected": 124000,
+  "actual": 123588,
+  "variance": -412,
+  "lines": [
+    {
+      "id": "rev1",
+      "source": "advisory",
+      "label": "Advisory fees",
+      "expected": 98000,
+      "actual": 98000,
+      "variance": 0,
+      "docId": "d4",
+      "ref": null,
+      "status": "ok"
+    },
+    {
+      "id": "rev2",
+      "source": "commission",
+      "label": "Commission payouts",
+      "expected": 18000,
+      "actual": 18000,
+      "variance": 0,
+      "docId": "d4",
+      "ref": null,
+      "status": "ok"
+    },
+    {
+      "id": "rev3",
+      "source": "trail",
+      "label": "Trail · September",
+      "expected": 8000,
+      "actual": 7588,
+      "variance": -412,
+      "docId": "d4",
+      "ref": "4471",
+      "status": "short",
+      "reason": "Paid $7,588.00 vs. $8,000.00 expected."
+    }
+  ],
+  "flags": [
+    {
+      "lineId": "rev3",
+      "status": "short",
+      "severity": "high",
+      "message": "September trail payout is $412 below the expected fee schedule. Review the payout statement."
+    }
+  ],
+  "period": "2026-09"
+}
