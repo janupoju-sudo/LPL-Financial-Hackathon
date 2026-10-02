@@ -15,9 +15,9 @@ Branch: `C/Backend-and-Workflows` · Full API + contracts: [`backend/README.md`]
 
 | Output | Value |
 |---|---|
-| `ApiUrl` | `_pending_` |
-| `UserPoolId` | `_pending_` |
-| `UserPoolClientId` | `_pending_` |
+| `ApiUrl` | `https://ftvp1nm03k.execute-api.us-east-1.amazonaws.com` |
+| `UserPoolId` | `us-east-1_2xeTJpaCX` |
+| `UserPoolClientId` | `o0p82o95ae8t9mspf1dkd335o` |
 | `DocsBucketName` | `_pending_` |
 | `TableName` | `ledgerline-dev` |
 | `CreateBillFunctionArn` | `_pending_` |

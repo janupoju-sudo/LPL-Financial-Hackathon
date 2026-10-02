@@ -1,5 +1,5 @@
 {
-  "answer": "Q3 operating margin is 38.7%. September expenses increased, including the $2,450 Advent Software invoice and $1,850 Northstar Studio invoice. The September payout statement also shows trail revenue $412 below expected. Review these source documents before drawing conclusions about the change.",
+  "answer": "Q3 operating margin is 38.7%. September expenses increased, including the $2,450 Advent Software invoice and $1,850 Brightline Marketing invoice. The September payout statement also shows trail revenue $412 below expected. Review these source documents before drawing conclusions about the change.",
   "citations": [
     {
       "documentId": "d1",
@@ -8,7 +8,7 @@
     },
     {
       "documentId": "d2",
-      "label": "Northstar invoice",
+      "label": "Brightline invoice",
       "snippet": "Marketing · $1,850"
     },
     {

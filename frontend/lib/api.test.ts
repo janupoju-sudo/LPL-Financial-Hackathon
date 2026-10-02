@@ -17,9 +17,9 @@ test('approval enforces role, unblocks on vendor documents, and updates balanced
   const before = await api.financials('2026-Q3');
   await assert.rejects(api.decision('b1', 'approve', '', 'ops'), /Switch/);
   await assert.rejects(api.decision('b2', 'approve', '', 'partner'), /W-9/);
-  await api.upload(new File(['sample'], 'northstar-w9.pdf', { type: 'application/pdf' }), () => {});
+  await api.upload(new File(['sample'], 'brightline-w9.pdf', { type: 'application/pdf' }), () => {});
   await assert.rejects(api.decision('b2', 'approve', '', 'partner'), /W-9/);
-  await api.upload(new File(['sample'], 'northstar-void-check.pdf', { type: 'application/pdf' }), () => {});
+  await api.upload(new File(['sample'], 'brightline-void-check.pdf', { type: 'application/pdf' }), () => {});
   assert.equal((await api.decision('b2', 'approve', '', 'partner')).status, 'scheduled');
   assert.equal((await api.decision('b1', 'approve', '', 'partner')).status, 'scheduled');
   await assert.rejects(api.decision('b1', 'approve', '', 'partner'), /not awaiting/);
