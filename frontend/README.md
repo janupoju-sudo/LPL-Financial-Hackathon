@@ -8,7 +8,7 @@ npm.cmd run dev
 
 Open http://localhost:3000. Mock mode is enabled by default. The role switcher is for demo sessions only. Copy `.env.example` to `.env.local`, set the API and Cognito values, and set `NEXT_PUBLIC_USE_MOCKS=false` to use AWS.
 
-For live deployment, use `.env.live.example` with the stack's `ApiUrl`, `UserPoolId` and `UserPoolClientId`. Disable both mock and local API flags. Apply the same values in Amplify's environment before building. Role E owns the Amplify Hosting repository connection (E2); Akshaya owns frontend configuration and deployed UI validation (A11). See `docs/handoffs/A-frontend.md`. The checked-in handoff still lists stack outputs as pending; the example does not imply that a live connection has been verified.
+For live deployment, use `.env.live.example` with the stack's `ApiUrl`, `UserPoolId` and `UserPoolClientId` recorded in `docs/handoffs/README.md`. Disable both mock and local API flags. Apply the same values in Amplify's environment before building. Role E owns the Amplify Hosting repository connection (E2); Akshaya owns frontend configuration and deployed UI validation (A11). See `docs/handoffs/A-frontend.md`.
 
 ## D's local endpoints (no AWS)
 

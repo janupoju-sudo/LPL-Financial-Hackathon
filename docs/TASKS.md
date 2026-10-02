@@ -36,7 +36,7 @@ Dependencies are noted as `← B3` (wait on, or mock, that task).
 - [A] A13. Loading skeletons, empty states, toast notifications, live refresh after approval
 - [A] A14. Card transactions page (CSV import) ← C9
 - [A] A15. Profile settings panel with persistent dark mode toggle
-- [AK] A16. Align Brightline demo vendor and switch frontend to deployed stack outputs (awaiting ApiUrl, UserPoolId, UserPoolClientId)
+- [AK] A16. Align Brightline demo vendor and switch frontend to deployed stack outputs
 
 ---
 
