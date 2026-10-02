@@ -83,9 +83,12 @@ def normalize_invoice(
         if not isinstance(gl_account, str) or not re.fullmatch(r"6\d{3}", gl_account):
             raise ValueError("glAccount must be a 6xxx expense code")
 
+    confidence = _confidence(result.get("confidence"))
+    vendor_confidence = _confidence(result.get("vendorConfidence"))
     return {
         "type": document_type,
-        "confidence": _confidence(result.get("confidence")),
+        "confidence": min(confidence, vendor_confidence),
+        "vendorConfidence": vendor_confidence,
         "vendorName": vendor_name.strip() if vendor_name else None,
         "amount": _money(result.get("amount"), "amount"),
         "invoiceNumber": result.get("invoiceNumber") or None,
@@ -171,14 +174,17 @@ def handler(event: Mapping[str, Any], context: Any = None) -> dict[str, Any]:
     try:
         if document_type in {"invoice", "receipt"}:
             schema = (
-                '{"confidence": number, "vendorName": string|null, "amount": number|null, '
+                '{"confidence": number, "vendorConfidence": number, '
+                '"vendorName": string|null, "amount": number|null, '
                 '"invoiceNumber": string|null, "invoiceDate": "YYYY-MM-DD"|null, '
                 '"dueDate": "YYYY-MM-DD"|null, "glAccount": "6xxx"|null, '
                 '"lineItems": [{"description": string, "amount": number}]}'
             )
             response = invoke_bedrock_json(
                 f"Normalize these Textract invoice fields. Use only supplied evidence; "
-                f"unknown fields are null. Return JSON matching {schema}.\n"
+                f"unknown fields are null. `confidence` is overall extraction confidence; "
+                f"`vendorConfidence` is confidence that vendorName identifies the correct "
+                f"vendor. Return JSON matching {schema}.\n"
                 f"{_expense_context(raw)}"
             )
             normalized = normalize_invoice(document_type, response)

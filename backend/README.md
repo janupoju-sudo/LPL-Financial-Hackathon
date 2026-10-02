@@ -92,15 +92,20 @@ Money in the API is **dollars**. Money in the ledger is **integer cents**.
 
 1. **Uploads land at** `uploads/<practiceId>/<documentId>/<filename>` in `DocsBucketName`. The SAM template already routes S3 `Object Created` events under `uploads/` to `IngestDocument`; `LockDocumentFunction` also listens and applies Object Lock retention, so you don't need to handle either trigger.
 2. **Update the document** as you go: `repo.update_document(practice_id, document_id, type="invoice", status="extracting"|"processed"|"needs_review", confidence=0.93, extracted={...})`. Types: `invoice · receipt · void_check · w9 · payout_statement · unknown`.
-3. **Invoices/receipts → invoke `CreateBillFunction`** (ARN in outputs; the SAM state machine policy already grants this invocation) with:
+3. **Canonical normalized fields** (omitted optional values are `null`; invoice and receipt amounts are dollars, payout `actual` is integer cents):
+   - Invoice / receipt: `{type, confidence, vendorConfidence, vendorName, amount, invoiceNumber, invoiceDate, dueDate, glAccount, lineItems:[{description, amount}]}`. Both confidences are 0–1; the bill uses the lower of overall and vendor confidence, so a vendor confidence below `0.8` routes to human review even when the total is clear.
+   - W-9 / void check: `{type, confidence, vendorName, hasW9, hasVoidCheck, bankLast4}`. `hasW9` / `hasVoidCheck` are derived from the document type; `bankLast4` is the final four digits when present.
+   - Payout statement: `{type, confidence, period, revenueLines:[{id, source, ref?, label, actual, docId}]}`. `source` is `advisory | commission | trail | other`; `ref` is present when a contract/product reference can be extracted.
+4. **Invoices/receipts → invoke `CreateBillFunction`** (ARN in outputs; the SAM state machine policy already grants this invocation) with:
    ```json
    {"practiceId":"p1","documentId":"doc_..","vendorId":"ven_..","vendorName":"Orion Software LLC",
     "amount":1850.00,"invoiceNumber":"INV-2041","invoiceDate":"2026-09-28","dueDate":"2026-10-28",
     "glAccount":"6300","lineItems":[...],"confidence":0.93}
    ```
    Pass `vendorId` if your matcher found one, otherwise just `vendorName` (exact/alias match, else auto-create). The vendor's `defaultGlAccount` is used when you omit `glAccount`. Returns `{billId, status, isDuplicate}`.
-4. **Vendor helpers** (`shared/repo.py`): `list_vendors`, `find_vendor_by_name`, `create_vendor`, `add_vendor_alias` (call this after a fuzzy match so next time it's exact; this is the "vendor memory").
-5. **W-9 / void check →** `repo.record_vendor_docs(practice_id, vendor_id, has_w9=True, has_void_check=True, bank_last4="6789", document_id=doc_id)`. This emits `VendorUpdated`, and any bills on hold for that vendor resume automatically.
+5. **Vendor helpers** (`shared/repo.py`): `list_vendors`, `find_vendor_by_name`, `create_vendor`, `add_vendor_alias` (call this after a fuzzy match so next time it's exact; this is the "vendor memory").
+6. **W-9 / void check →** `repo.record_vendor_docs(practice_id, vendor_id, has_w9=True, has_void_check=True, bank_last4="6789", document_id=doc_id)`. This emits `VendorUpdated`, and any bills on hold for that vendor resume automatically. Both documents are required by the default vendor-doc rule; a bill remains held until both flags are true.
+7. **Payout statements** save actual payout lines and post the extracted totals to the ledger. The $412 expected-vs-actual shortfall is flagged by D's reconciliation endpoint; B does not create a separate ingest review item solely for a shortfall.
 
 ## Contract for D (Financials), agreed format
 
