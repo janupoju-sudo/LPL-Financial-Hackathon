@@ -42,11 +42,11 @@ def sample_entries():
                                    ("4200", 0, com), ("4300", 0, trl)],
                       "LPL payout", doc=f"payout-{mm}")
         e += _journal(f"{mm}-25", [("6100", 77_000, 0), ("1000", 0, 77_000)], "Payroll")
-        e += _bill(f"{mm}-01", f"{mm}-05", "6200", 9_800 if q3 else 7_400, "Summit Office Partners rent",
+        e += _bill(f"{mm}-01", f"{mm}-05", "6200", 9_800 if q3 else 7_400, "Seaport Office Partners rent",
                    doc=f"rent-{mm}")
         e += _bill(f"{mm}-27", f"{mm}-28", "6400", 32_400 if q3 else 31_000, "LPL platform fees")
-        e += _bill(f"{mm}-10", f"{mm}-20", "6300", 6_200, "Brightline IT Services")
-        e += _bill(f"{mm}-12", f"{mm}-22", "6500", 5_400, "Northgate Marketing")
+        e += _bill(f"{mm}-10", f"{mm}-20", "6300", 6_200, "Orion Software LLC")
+        e += _bill(f"{mm}-12", f"{mm}-22", "6500", 5_400, "Brightline Marketing")
         e += _bill(f"{mm}-15", f"{mm}-25", "6700", 2_100 + 100 * m, "Client events")
         if q3:
             e += _bill(f"{mm}-17", f"{mm}-27", "6600", 850, "Clearpath Compliance", doc=f"clearpath-{mm}")
@@ -54,7 +54,7 @@ def sample_entries():
     e += _journal("2026-08-31", [("6100", 11_000, 0), ("2200", 0, 11_000)], "Staff bonus accrual")
     e += _journal("2026-09-15", [("2200", 11_000, 0), ("1000", 0, 11_000)], "Staff bonus paid")
     # One September bill still open at quarter end.
-    e += _bill("2026-09-29", None, "6300", 1_240, "Brightline IT Services INV-2291", doc="d1")
+    e += _bill("2026-09-29", None, "6300", 1_240, "Orion Software LLC INV-2291", doc="d1")
     return e
 
 
@@ -82,14 +82,14 @@ PAYOUT_SEP = [
 
 # Document list as GET /documents returns it, plus s3Key.
 DOCUMENTS = [
-    {"documentId": "d1", "type": "invoice", "filename": "Brightline_INV-2291.pdf", "vendorName": "Brightline IT Services",
+    {"documentId": "d1", "type": "invoice", "filename": "Orion_INV-2291.pdf", "vendorName": "Orion Software LLC",
      "amount": 1240.0, "createdAt": "2026-09-29", "s3Key": "uploads/d1.pdf"},
-    {"documentId": "rent-2026-07", "type": "invoice", "filename": "Summit_Lease_Amendment_Q3.pdf",
-     "vendorName": "Summit Office Partners", "amount": 9800.0, "createdAt": "2026-07-01", "s3Key": "uploads/rent7.pdf"},
+    {"documentId": "rent-2026-07", "type": "invoice", "filename": "Seaport_Lease_Amendment_Q3.pdf",
+     "vendorName": "Seaport Office Partners", "amount": 9800.0, "createdAt": "2026-07-01", "s3Key": "uploads/rent7.pdf"},
     {"documentId": "clearpath-2026-09", "type": "invoice", "filename": "Clearpath_Compliance_0917.pdf",
      "vendorName": "Clearpath Compliance", "amount": 850.0, "createdAt": "2026-09-17", "s3Key": "uploads/cp9.pdf"},
     {"documentId": "payout-2026-09", "type": "payout_statement", "filename": "LPL_Payout_Sep2026.pdf",
      "vendorName": "LPL Financial", "amount": 218000.0, "createdAt": "2026-09-30", "s3Key": "uploads/payout9.pdf"},
-    {"documentId": "w9-north", "type": "w9", "filename": "Northgate_W9.pdf", "vendorName": "Northgate Marketing",
+    {"documentId": "w9-orion", "type": "w9", "filename": "Orion_W9.pdf", "vendorName": "Orion Software LLC",
      "amount": None, "createdAt": "2026-06-12", "s3Key": "uploads/w9.pdf"},
 ]

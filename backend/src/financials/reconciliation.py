@@ -86,9 +86,12 @@ def compute(schedule: list[dict], payout_lines: list[dict], period: str) -> dict
                 "variance": variance, "status": status, "docId": doc}
         if status != "ok":
             line["reason"] = _reason(item, expected, actual)
-            flags.append({"lineId": line["id"], "status": status,
-                          "severity": "high" if status in ("short", "missing") else "medium",
-                          "message": f"{label}: {status}, {variance / 100:+,.2f}. {line['reason']}"})
+            # id/reason/docId are what the frontend reads; the rest is extra detail.
+            flags.append({"id": f"flag-{line['id']}", "lineId": line["id"], "docId": doc,
+                          "reason": f"{label} is ${abs(variance) / 100:,.2f} {status}. {line['reason']}"
+                          if status in ("short", "over") else f"{label}: {line['reason']}",
+                          "status": status,
+                          "severity": "high" if status in ("short", "missing") else "medium"})
         lines.append(line)
 
     for item in schedule:

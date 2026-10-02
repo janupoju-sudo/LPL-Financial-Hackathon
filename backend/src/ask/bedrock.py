@@ -11,7 +11,6 @@ import json
 import os
 
 import boto3
-from anthropic import AnthropicBedrockMantle
 
 from .answer import Refused
 
@@ -23,7 +22,10 @@ _runtime = None
 
 def claude_json(system: str, user: str, schema: dict) -> dict:
     global _claude
-    _claude = _claude or AnthropicBedrockMantle(aws_region=os.environ["AWS_REGION"])
+    if _claude is None:
+        # Imported here so the rest of the backend (and its tests) don't need the SDK.
+        from anthropic import AnthropicBedrockMantle
+        _claude = AnthropicBedrockMantle(aws_region=os.environ["AWS_REGION"])
     resp = _claude.messages.create(
         model=MODEL_ID,
         max_tokens=16000,

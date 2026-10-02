@@ -23,7 +23,7 @@ curl -H "Authorization: Bearer $TOKEN_OWNER" "$API/bills?status=pending_approval
 ```bash
 cd backend && python -m venv .venv && source .venv/bin/activate
 pip install -r requirements-dev.txt
-pytest -q            # 20 tests: rules engine, ledger, full bill lifecycle (moto)
+pytest -q            # 53 tests: rules engine, ledger, bill lifecycle, financials, reconciliation, ask, export (moto)
 cfn-lint template.yaml
 ```
 
@@ -69,6 +69,10 @@ Controls: no self-approval (uploader ≠ approver), one decision per task token 
 | GET | `/rules` | | rules (defaults seeded on first call) |
 | POST | `/rules` | `{name, condition, action, approverRole?, priority?, reason?}` | owner only |
 | PATCH | `/rules/{id}` | e.g. `{"enabled": false}` | owner only |
+| GET | `/financials` | `?period=2026-Q3` (or `2026-09`, `2026`) | `{period, pnl:{revenue, expenses, netIncome, monthly[6], categories, revenueLines, expenseLines}, balanceSheet:{assets, liabilities, equity, ...Lines}, cashFlow:{operating, investing, financing, net, ...}, kpis:{margin, recurringPct, revPerClient, expenseRatios, previous}, valuation:{low, mid, high, method, ...}}`; percentages 0–100, matching `frontend/lib/types.ts` (D) |
+| GET | `/revenue/reconciliation` | `?period=2026-09` | `{period, expected, actual, variance, lines:[{id, label, source, ref, expected, actual, variance, status, docId, reason?}], flags:[{id, reason, docId, lineId, status, severity}]}`; `status` = ok/short/over/missing/unexpected (D) |
+| POST | `/ask` | `{question}` | `{answer, citations:[{documentId, label, snippet}], period}` (D) |
+| POST | `/export` | `{period}` | `{downloadUrl, documents, ledgerLines, missing}`; `downloadUrl` valid 15 min (D) |
 
 Money in the API is **dollars**. Money in the ledger is **integer cents**.
 
@@ -98,6 +102,8 @@ Money in the API is **dollars**. Money in the ledger is **integer cents**.
 - **Fee schedule**: lives on the practice META item as `feeSchedule` (amounts/aum in int cents, `annualRate` as a fraction) and comes back from `ddb.get_practice(p)`. `scripts/seed.py` writes a sample one; E may replace it.
 - **COA** is in `shared/coa.py` (your codes). `Bill.glAccount` is validated as 6xxx.
 - **`/financials` route**: once your code is under `src/financials/`, Jay adds `FinancialsFunction` to `template.yaml` (he owns that file, so send him anything else you need). The `LedgerUpdated` event on the `ledgerline-<stage>` bus fires after every posting if you want to cache.
+
+**D's code** is in `src/financials` (statements, KPIs, valuation, reconciliation), `src/ask` (Claude on Bedrock + guardrail) and `src/export`. Its AWS resources (3 functions, `ExportsBucket`, the Bedrock Guardrail) are in `infra/d-resources.yaml`, ready to paste into `template.yaml`. `python3 dev_server.py` serves D's four routes on localhost:8787 from sample data, no AWS needed. After deploy: `GUARDRAIL_ID=... GUARDRAIL_VERSION=1 python3 scripts/check_guardrail.py`.
 
 ## Contract for A (Frontend)
 
