@@ -5,7 +5,7 @@ from typing import Any, Literal, Mapping, NotRequired, TypedDict
 
 class RevenueLine(TypedDict):
     id: str
-    source: Literal["advisory", "commission", "trail"]
+    source: Literal["advisory", "commission", "trail", "other"]
     label: str
     actual: int
     docId: str
@@ -74,7 +74,7 @@ def parse_payout_lines(
             for column, value in header_row.items()
         }
         amount_column = _find_column(headers, _AMOUNT_HEADERS)
-        label_column = _find_column(headers, _LABEL_HEADERS)
+        label_column = _find_label_column(headers)
         if amount_column is None or label_column is None:
             continue
 
@@ -162,6 +162,22 @@ def _find_column(headers: Mapping[int, str], names: set[str]) -> int | None:
     return next((column for column, name in headers.items() if name in names), None)
 
 
+def _find_label_column(headers: Mapping[int, str]) -> int | None:
+    for name in (
+        "description",
+        "detail",
+        "income",
+        "product",
+        "transaction",
+        "revenuetype",
+        "type",
+    ):
+        column = _find_column(headers, {name})
+        if column is not None:
+            return column
+    return None
+
+
 def _column_value(
     values: Mapping[str, str],
     headers: Mapping[int, str],
@@ -175,7 +191,9 @@ def _column_value(
     return ""
 
 
-def _revenue_source(value: str) -> Literal["advisory", "commission", "trail"]:
+def _revenue_source(
+    value: str,
+) -> Literal["advisory", "commission", "trail", "other"]:
     normalized = value.casefold()
     if "trail" in normalized:
         return "trail"
@@ -183,6 +201,8 @@ def _revenue_source(value: str) -> Literal["advisory", "commission", "trail"]:
         return "advisory"
     if "commission" in normalized:
         return "commission"
+    if "other" in normalized:
+        return "other"
     raise ValueError(f"Unrecognized payout revenue source: {value!r}")
 
 

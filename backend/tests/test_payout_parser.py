@@ -1,6 +1,6 @@
 import unittest
 
-from payout_parser import parse_payout_lines
+from ingest.payout_parser import parse_payout_lines
 
 
 def _word(block_id: str, text: str) -> dict[str, str]:
@@ -102,13 +102,27 @@ class ParsePayoutLinesTests(unittest.TestCase):
                 _cell("h2", 1, 2, ["amount"]),
                 _word("amount", "Amount"),
                 _cell("r1", 2, 1, ["label"]),
-                _word("label", "Other income"),
+                _word("label", "Miscellaneous income"),
                 _cell("r2", 2, 2, ["value"]),
                 _word("value", "$10.00"),
             ]
         }
         with self.assertRaisesRegex(ValueError, "Unrecognized payout revenue source"):
             parse_payout_lines(response, "d3")
+
+    def test_preserves_explicit_other_revenue_source(self) -> None:
+        lines = parse_payout_lines(
+            _textract_table(
+                [
+                    ["Type", "Description", "Amount"],
+                    ["Other", "Other income", "$12.34"],
+                ]
+            ),
+            "d4",
+        )
+        self.assertEqual(lines[0]["source"], "other")
+        self.assertEqual(lines[0]["label"], "Other income")
+        self.assertEqual(lines[0]["actual"], 1234)
 
 
 if __name__ == "__main__":
