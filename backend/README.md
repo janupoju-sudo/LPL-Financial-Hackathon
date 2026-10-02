@@ -9,6 +9,9 @@ brew install aws-sam-cli awscli        # once
 aws configure                          # region us-east-1
 cd backend
 sam build && sam deploy --guided       # first time; stack name ledgerline-dev; accept defaults
+# sam build needs Python 3.12 on your Mac (brew install python@3.12) because src/requirements.txt
+# installs the anthropic SDK; or use `sam build --use-container` with Docker running.
+# Before testing /ask: Bedrock console -> Model access -> enable the model in ASK_MODEL_ID.
 python scripts/seed.py --table ledgerline-dev
 python scripts/demo_users.py --user-pool-id <UserPoolId> --client-id <UserPoolClientId>
 ```
@@ -23,7 +26,7 @@ curl -H "Authorization: Bearer $TOKEN_OWNER" "$API/bills?status=pending_approval
 ```bash
 cd backend && python -m venv .venv && source .venv/bin/activate
 pip install -r requirements-dev.txt
-pytest -q            # 20 tests: rules engine, ledger, full bill lifecycle (moto)
+pytest -q            # 53 tests: rules, ledger, bill lifecycle, financials, ask, export (moto)
 cfn-lint template.yaml
 ```
 
@@ -69,6 +72,10 @@ Controls: no self-approval (uploader ≠ approver), one decision per task token 
 | GET | `/rules` | | rules (defaults seeded on first call) |
 | POST | `/rules` | `{name, condition, action, approverRole?, priority?, reason?}` | owner only |
 | PATCH | `/rules/{id}` | e.g. `{"enabled": false}` | owner only |
+| GET | `/financials` | `?period=2026-Q3` (or `2026-09`, `2026`; default current quarter) | P&L, balance sheet, cash flow, KPIs, valuation (D) |
+| GET | `/revenue/reconciliation` | `?period=2026-09` (default current month) | expected vs actual per line + flags (D) |
+| POST | `/ask` | `{question}` | answer + citations; Claude on Bedrock behind a guardrail (D) |
+| POST | `/export` | `{period}` | `{downloadUrl, documents, ledgerLines, missing}`: ZIP in the exports bucket, expires after 1 day (D) |
 
 Money in the API is **dollars**. Money in the ledger is **integer cents**.
 
