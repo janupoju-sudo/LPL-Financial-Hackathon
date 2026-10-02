@@ -12,15 +12,15 @@ endobj
 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
 endobj
 5 0 obj
-<< /Length 358 >>
+<< /Length 360 >>
 stream
 BT /F1 12 Tf 55 760 Td 22 TL (SAMPLE - FICTIONAL DATA) Tj
 T* () Tj
 T* (HARBOR POINT WEALTH) Tj
-T* (northstar-brand-studio.pdf) Tj
+T* (brightline-marketing.pdf) Tj
 T* () Tj
-T* (vendor: Northstar Studio) Tj
-T* (invoiceNumber: NS-104) Tj
+T* (vendor: Brightline Marketing) Tj
+T* (invoiceNumber: BM-104) Tj
 T* (amount: 1850) Tj
 T* (dueDate: 2026-10-10) Tj
 T* (glAccount: 6500 - Marketing) Tj
@@ -39,5 +39,5 @@ xref
 trailer
 << /Size 6 /Root 1 0 R >>
 startxref
-720
+722
 %%EOF

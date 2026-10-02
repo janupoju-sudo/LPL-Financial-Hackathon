@@ -22,15 +22,15 @@
   {
     "id": "d2",
     "type": "invoice",
-    "filename": "northstar-brand-studio.pdf",
+    "filename": "brightline-marketing.pdf",
     "status": "processed",
-    "vendorName": "Northstar Studio",
+    "vendorName": "Brightline Marketing",
     "amount": 1850,
     "createdAt": "2026-09-25",
     "confidence": 0.94,
     "extracted": {
-      "vendor": "Northstar Studio",
-      "invoiceNumber": "NS-104",
+      "vendor": "Brightline Marketing",
+      "invoiceNumber": "BM-104",
       "amount": 1850,
       "dueDate": "2026-10-10",
       "glAccount": "6500 · Marketing"

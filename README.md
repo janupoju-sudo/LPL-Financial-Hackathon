@@ -31,7 +31,7 @@ Open http://localhost:3000. On Windows, `npm.cmd` avoids PowerShell execution-po
 
 1. Inbox → upload a PDF invoice. Mock mode uses Advent sample fields; it retains the uploaded file for preview and does not perform actual AI extraction.
 2. Switch to Partner view → approve Advent's bill. Its status changes to Scheduled (simulated payment) and the dashboard updates.
-3. Northstar's bill is blocked until both a file named `northstar-w9.pdf` and a file named `northstar-void-check.pdf` have been uploaded. Mock mode assigns these documents to Northstar. Then approve the bill.
+3. Brightline's bill is blocked until both a file named `brightline-w9.pdf` and a file named `brightline-void-check.pdf` have been uploaded. Mock mode assigns these documents to Brightline. Then approve the bill.
 4. Revenue → inspect the seeded $412 trail shortfall; click the statement.
 5. Dashboard → view statements and estimated valuation. Ask → use the Q3 margin suggestion and open citations.
 6. Library → export a ZIP with documents, `ledger.csv`, and `financials.json`.

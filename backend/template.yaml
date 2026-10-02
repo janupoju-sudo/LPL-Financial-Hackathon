@@ -22,6 +22,18 @@ Parameters:
     Type: String
     Default: "false"
     AllowedValues: ["true", "false"]
+  BedrockModelId:
+    Type: String
+    Description: Exact Bedrock model ID approved and enabled for this hackathon account.
+  IngestModelId:
+    Type: String
+    Default: ""
+    Description: >
+      Model for ingest classify/normalize (boto3 Converse, which serves Opus 4.6 and earlier).
+      Use an inference profile ID such as us.anthropic.claude-sonnet-4-6. Empty = use BedrockModelId.
+
+Conditions:
+  HasIngestModelId: !Not [!Equals [!Ref IngestModelId, ""]]
 
 Globals:
   Function:
@@ -99,6 +111,8 @@ Resources:
       UserPoolName: !Sub ledgerline-${Stage}
       UsernameAttributes: [email]
       AutoVerifiedAttributes: [email]
+      AdminCreateUserConfig:
+        AllowAdminCreateUserOnly: true     # no self-signup; users come from demo_users.py
       Schema:
         - Name: practiceId
           AttributeDataType: String
@@ -223,14 +237,15 @@ Resources:
       MemorySize: 512
       Environment:
         Variables:
-          ASK_MODEL_ID: anthropic.claude-opus-5-5
+          ASK_MODEL_ID: !Ref BedrockModelId
           GUARDRAIL_ID: !GetAtt AskGuardrail.GuardrailId
           GUARDRAIL_VERSION: !GetAtt AskGuardrailVersion.Version
       Policies:
         - DynamoDBReadPolicy: { TableName: !Ref LedgerTable }
         - Statement:
             - Effect: Allow
-              Action: [bedrock:InvokeModel, bedrock:InvokeModelWithResponseStream]
+              # AnthropicBedrockMantle (Messages API endpoint) authorizes as bedrock-mantle:CreateInference
+              Action: [bedrock-mantle:CreateInference, bedrock:InvokeModel, bedrock:InvokeModelWithResponseStream]
               Resource: "*"
             - Effect: Allow
               Action: bedrock:ApplyGuardrail
@@ -411,6 +426,120 @@ Resources:
                 object:
                   key: [{ prefix: uploads/ }]
 
+  # ---------------------------------------------------------------- B: document ingest
+  ClassifyFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: ingest.classify.handler
+      Timeout: 60
+      Environment:
+        Variables:
+          BEDROCK_MODEL_ID: !If [HasIngestModelId, !Ref IngestModelId, !Ref BedrockModelId]
+      Policies:
+        - DynamoDBCrudPolicy: { TableName: !Ref LedgerTable }
+        - S3ReadPolicy: { BucketName: !Ref DocsBucket }
+        - Statement:
+            - Effect: Allow
+              Action: [bedrock:InvokeModel]
+              Resource: "*"
+
+  ExtractFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: ingest.extract.handler
+      Timeout: 900
+      MemorySize: 512
+      Policies:
+        - S3ReadPolicy: { BucketName: !Ref DocsBucket }
+        - S3WritePolicy: { BucketName: !Ref DocsBucket }
+        - Statement:
+            - Effect: Allow
+              Action:
+                - textract:StartExpenseAnalysis
+                - textract:GetExpenseAnalysis
+                - textract:StartDocumentAnalysis
+                - textract:GetDocumentAnalysis
+              Resource: "*"
+
+  NormalizeFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: ingest.normalize.handler
+      Timeout: 60
+      Environment:
+        Variables:
+          BEDROCK_MODEL_ID: !If [HasIngestModelId, !Ref IngestModelId, !Ref BedrockModelId]
+      Policies:
+        - S3ReadPolicy: { BucketName: !Ref DocsBucket }
+        - Statement:
+            - Effect: Allow
+              Action: [bedrock:InvokeModel]
+              Resource: "*"
+
+  MatchVendorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: ingest.match_vendor.handler
+      Policies:
+        - DynamoDBCrudPolicy: { TableName: !Ref LedgerTable }
+
+  PrepareBillFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: ingest.route.prepare_bill
+
+  FinalizeIngestFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: ingest.route.handler
+      Policies:
+        - DynamoDBCrudPolicy: { TableName: !Ref LedgerTable }
+        - EventBridgePutEventsPolicy: { EventBusName: !Ref AppEventBus }
+
+  IngestFailureFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: ingest.failure.handler
+      Policies:
+        - DynamoDBCrudPolicy: { TableName: !Ref LedgerTable }
+
+  IngestDocumentStateMachine:
+    Type: AWS::Serverless::StateMachine
+    Properties:
+      Name: !Sub ledgerline-ingest-${Stage}
+      Type: STANDARD
+      DefinitionUri: statemachines/ingest_document.asl.json
+      DefinitionSubstitutions:
+        ClassifyFunctionArn: !GetAtt ClassifyFunction.Arn
+        ExtractFunctionArn: !GetAtt ExtractFunction.Arn
+        NormalizeFunctionArn: !GetAtt NormalizeFunction.Arn
+        MatchVendorFunctionArn: !GetAtt MatchVendorFunction.Arn
+        PrepareBillFunctionArn: !GetAtt PrepareBillFunction.Arn
+        FinalizeFunctionArn: !GetAtt FinalizeIngestFunction.Arn
+        FailureFunctionArn: !GetAtt IngestFailureFunction.Arn
+        CreateBillFunctionArn: !GetAtt CreateBillFunction.Arn
+      Policies:
+        - LambdaInvokePolicy: { FunctionName: !Ref ClassifyFunction }
+        - LambdaInvokePolicy: { FunctionName: !Ref ExtractFunction }
+        - LambdaInvokePolicy: { FunctionName: !Ref NormalizeFunction }
+        - LambdaInvokePolicy: { FunctionName: !Ref MatchVendorFunction }
+        - LambdaInvokePolicy: { FunctionName: !Ref PrepareBillFunction }
+        - LambdaInvokePolicy: { FunctionName: !Ref FinalizeIngestFunction }
+        - LambdaInvokePolicy: { FunctionName: !Ref IngestFailureFunction }
+        - LambdaInvokePolicy: { FunctionName: !Ref CreateBillFunction }
+      Events:
+        UploadedDocument:
+          Type: EventBridgeRule
+          Properties:
+            Pattern:
+              source: [aws.s3]
+              detail-type: [Object Created]
+              detail:
+                bucket:
+                  name: [!Ref DocsBucket]
+                object:
+                  key: [{ prefix: uploads/ }]
+
   ApproveBillStateMachine:
     Type: AWS::Serverless::StateMachine
     Properties:
@@ -458,3 +587,5 @@ Outputs:
   CreateBillFunctionArn:
     Description: Invoke from the IngestDocument state machine (role B)
     Value: !GetAtt CreateBillFunction.Arn
+  IngestDocumentStateMachineArn:
+    Value: !Ref IngestDocumentStateMachine

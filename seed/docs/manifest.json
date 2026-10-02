@@ -1,0 +1,167 @@
+{
+  "generated_by": "seed/generate_docs.py",
+  "watermark": "SAMPLE \u2014 FICTIONAL DATA",
+  "files": [
+    {
+      "filename": "orion_invoice_450_2026-09-02.pdf",
+      "document_type": "invoice",
+      "vendor_name": "Orion Software LLC",
+      "expected_fields": {
+        "vendor_name": "Orion Software LLC",
+        "amount": 450.0,
+        "invoice_number": "INV-OR-2026-0902-001",
+        "invoice_date": "2026-09-02",
+        "due_date": "2026-09-30",
+        "gl_account": "6300"
+      },
+      "workflow_outcome": {
+        "status": "approved",
+        "rule": "auto_approve",
+        "reason": "amount <= $1,000 and vendor is already recognized"
+      }
+    },
+    {
+      "filename": "orion_invoice_1850_2026-09-12.pdf",
+      "document_type": "invoice",
+      "vendor_name": "Orion Software LLC",
+      "expected_fields": {
+        "vendor_name": "Orion Software LLC",
+        "amount": 1850.0,
+        "invoice_number": "INV-OR-2026-0912-002",
+        "invoice_date": "2026-09-12",
+        "due_date": "2026-10-12",
+        "gl_account": "6300"
+      },
+      "workflow_outcome": {
+        "status": "pending_approval",
+        "rule": "require_approval",
+        "required_approvers": [
+          "partner",
+          "owner"
+        ],
+        "reason": "amount > $1,000"
+      }
+    },
+    {
+      "filename": "brightline_invoice_650_2026-09-18.pdf",
+      "document_type": "invoice",
+      "vendor_name": "Brightline Marketing",
+      "expected_fields": {
+        "vendor_name": "Brightline Marketing",
+        "amount": 650.0,
+        "invoice_number": "INV-BRT-2026-0918-003",
+        "invoice_date": "2026-09-18",
+        "due_date": "2026-10-18",
+        "gl_account": "6500",
+        "onboarding_docs_missing": [
+          "w9",
+          "void_check"
+        ]
+      },
+      "workflow_outcome": {
+        "status": "held",
+        "rule": "vendor_docs_required",
+        "reason": "new vendor requires both W-9 and void check before approval"
+      }
+    },
+    {
+      "filename": "brightline_w9.pdf",
+      "document_type": "w9",
+      "vendor_name": "Brightline Marketing",
+      "expected_fields": {
+        "vendor_name": "Brightline Marketing",
+        "tax_id": "12-3456789",
+        "business_type": "LLC",
+        "authorized_signatory": "Dana Lasker"
+      },
+      "workflow_outcome": {
+        "status": "vendor_updated",
+        "reason": "W-9 arrives; vendor becomes eligible for review after matching"
+      }
+    },
+    {
+      "filename": "brightline_void_check.pdf",
+      "document_type": "void_check",
+      "vendor_name": "Brightline Marketing",
+      "expected_fields": {
+        "vendor_name": "Brightline Marketing",
+        "routing_number": "021000021",
+        "account_number": "302581198",
+        "bank_name": "Harbor Community Bank"
+      },
+      "workflow_outcome": {
+        "status": "vendor_updated",
+        "reason": "void check arrives; hold is cleared once W-9 and void check are both on file"
+      }
+    },
+    {
+      "filename": "receipt_scanned_2026-09-22.pdf",
+      "document_type": "receipt",
+      "vendor_name": "Riverside Cafe",
+      "expected_fields": {
+        "merchant": "Riverside Cafe",
+        "receipt_number": "RCPT-09122",
+        "date": "2026-09-22",
+        "total": 37.18,
+        "line_item_count": 5
+      },
+      "workflow_outcome": {
+        "status": "needs_review",
+        "reason": "receipt is readable but the match is uncertain; allow human validation if vendor confidence is low"
+      }
+    },
+    {
+      "filename": "lpl_payout_statement_sep_2026.pdf",
+      "document_type": "payout_statement",
+      "vendor_name": "LPL Financial",
+      "expected_fields": {
+        "vendor_name": "LPL Financial",
+        "statement_month": "2026-09",
+        "advisory_fees": 182400.0,
+        "mutual_fund_commissions": 14200.0,
+        "monthly_12b1_trails": 6150.0,
+        "actual_4471_cents": 247800,
+        "expected_4471_cents": 289000,
+        "total_paid": 205228,
+        "revenueLines": [
+          {
+            "id": "adv-1",
+            "source": "advisory",
+            "label": "Advisory fees",
+            "actual": 18240000,
+            "ref": ""
+          },
+          {
+            "id": "comm-1",
+            "source": "commission",
+            "label": "Mutual fund commissions",
+            "actual": 1420000,
+            "ref": ""
+          },
+          {
+            "id": "trail-12b1",
+            "source": "trail",
+            "label": "Monthly 12b-1 trails",
+            "actual": 615000,
+            "ref": "12b1"
+          },
+          {
+            "id": "trail-4471",
+            "source": "trail",
+            "label": "Variable annuity trail, contract 4471",
+            "actual": 247800,
+            "ref": "4471"
+          }
+        ]
+      },
+      "workflow_outcome": {
+        "status": "short",
+        "total_paid": 205228,
+        "actual_4471_cents": 247800,
+        "expected_4471_cents": 289000,
+        "variance_cents": -41200,
+        "reason": "contract 4471 shortfall: actual 247800, expected 289000"
+      }
+    }
+  ]
+}

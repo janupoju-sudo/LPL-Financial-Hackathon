@@ -17,10 +17,16 @@ provided service list allows Claude Opus 5, but does not list Claude Opus 5.5; d
 hardcode an unapproved model ID. The extractor Lambda needs a timeout long enough to
 poll Textract asynchronous jobs (up to 15 minutes).
 
-The state machine/event rule needs permission to invoke these Lambdas and
-`CreateBillFunction`. The Lambdas need access to Textract analysis APIs, Bedrock
-inference, the uploads/processing objects in the documents bucket, and the shared
-repository/ledger resources. The S3 EventBridge rule should match only `uploads/`
-keys; Textract results are written under `processing/` to avoid retriggering ingest.
+`backend/template.yaml` now contains the B functions, policies, model-ID parameter,
+Step Functions integration, and upload trigger. D's Ask function uses the same
+`BedrockModelId` parameter; neither path contains a default model ID.
+
+The S3 EventBridge rule matches only `uploads/` keys; Textract results are written
+under `processing/` to avoid retriggering ingest. Step Functions invokes the
+existing `CreateBillFunction` for invoices/receipts.
+
+When using E's `e/infra` branch, retain `backend/scripts/seed_ddb.py` but do not merge
+its `backend/template.yaml` as-is: that file re-adds D resources already present in
+`main`. Transfer the seed script separately when E is ready.
 
 No EC2 instances or other manually managed servers are required.

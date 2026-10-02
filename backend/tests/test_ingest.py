@@ -4,17 +4,47 @@ from types import ModuleType
 from unittest.mock import Mock, patch
 
 from ingest.classify import validate_classification
-from ingest.common import upload_context
+from ingest.common import invoke_bedrock_json, upload_context
 from ingest.match_vendor import best_vendor_match
 from ingest.normalize import (
     _normalized_vendor_document,
     _period,
     normalize_invoice,
 )
-from ingest.route import handler as route_handler, prepare_bill
+from ingest.route import (
+    complete_bill_handler,
+    handler as route_handler,
+    prepare_bill,
+)
 
 
 class IngestValidationTests(unittest.TestCase):
+    def test_bedrock_converse_does_not_send_deprecated_temperature(self) -> None:
+        client = Mock()
+        client.converse.return_value = {
+            "output": {"message": {"content": [{"text": '{"type":"invoice"}'}]}}
+        }
+        with (
+            patch.dict("os.environ", {"BEDROCK_MODEL_ID": "us.test-model"}),
+            patch("boto3.client", return_value=client),
+        ):
+            result = invoke_bedrock_json("classify")
+
+        self.assertEqual(result, {"type": "invoice"})
+        self.assertEqual(
+            client.converse.call_args.kwargs["inferenceConfig"],
+            {"maxTokens": 1200},
+        )
+
+    def test_ask_model_id_must_be_configured(self) -> None:
+        from ask.bedrock import model_id
+
+        with patch.dict("os.environ", {}, clear=True):
+            with self.assertRaisesRegex(RuntimeError, "ASK_MODEL_ID must be set"):
+                model_id()
+        with patch.dict("os.environ", {"ASK_MODEL_ID": "approved.model-id"}):
+            self.assertEqual(model_id(), "approved.model-id")
+
     def test_parses_practice_and_document_from_upload_key(self) -> None:
         self.assertEqual(
             upload_context(
@@ -53,6 +83,7 @@ class IngestValidationTests(unittest.TestCase):
             "invoice",
             {
                 "confidence": 0.95,
+                "vendorConfidence": 0.98,
                 "vendorName": "Orion Software LLC",
                 "amount": "$1,850.00",
                 "invoiceNumber": "INV-2041",
@@ -64,11 +95,82 @@ class IngestValidationTests(unittest.TestCase):
         )
         self.assertEqual(result["amount"], 1850.0)
         self.assertEqual(result["lineItems"][0]["amount"], 1850.0)
+        self.assertEqual(result["confidence"], 0.95)
+        self.assertEqual(result["vendorConfidence"], 0.98)
         with self.assertRaisesRegex(ValueError, "6xxx expense code"):
             normalize_invoice(
                 "invoice",
-                {"confidence": 0.9, "glAccount": "4100", "lineItems": []},
+                {
+                    "confidence": 0.9,
+                    "vendorConfidence": 0.9,
+                    "glAccount": "4100",
+                    "lineItems": [],
+                },
             )
+
+    def test_low_vendor_confidence_lowers_bill_confidence(self) -> None:
+        result = normalize_invoice(
+            "receipt",
+            {
+                "confidence": 0.98,
+                "vendorConfidence": 0.55,
+                "vendorName": "Brightline Marketing",
+                "amount": 42.50,
+            },
+        )
+        self.assertEqual(result["amount"], 42.5)
+        self.assertEqual(result["vendorConfidence"], 0.55)
+        self.assertEqual(result["confidence"], 0.55)
+
+    def test_low_vendor_confidence_marks_completed_bill_for_review(self) -> None:
+        repo = Mock()
+        config = ModuleType("config")
+        config.REVIEW_CONFIDENCE_THRESHOLD = 0.8
+        shared = ModuleType("shared")
+        shared.config = config
+        shared.repo = repo
+        event = {
+            "classification": {
+                "data": {
+                    "bucket": "docs",
+                    "key": "uploads/p1/d1/receipt.pdf",
+                    "practiceId": "p1",
+                    "documentId": "d1",
+                    "filename": "receipt.pdf",
+                    "documentType": "receipt",
+                }
+            },
+            "normalization": {
+                "data": {
+                    "normalized": {
+                        "type": "receipt",
+                        "confidence": 0.95,
+                        "vendorConfidence": 0.55,
+                        "vendorName": "Brightline Marketing",
+                        "amount": 42.5,
+                    }
+                }
+            },
+            "createdBill": {
+                "data": {"bill": {"billId": "bill-1", "status": "pending_review"}}
+            },
+        }
+
+        with patch.dict("sys.modules", {"shared": shared}):
+            result = complete_bill_handler(event)
+
+        self.assertEqual(result, {"status": "needs_review", "billId": "bill-1"})
+        update = repo.update_document.call_args.kwargs
+        self.assertEqual(update["status"], "needs_review")
+        self.assertEqual(update["confidence"], 0.55)
+        self.assertEqual(
+            update["extracted"]["reviewReason"],
+            "Vendor identity confidence requires confirmation",
+        )
+
+    def test_invoice_requires_vendor_confidence(self) -> None:
+        with self.assertRaisesRegex(ValueError, "confidence must be a number"):
+            normalize_invoice("invoice", {"confidence": 0.95, "amount": 100})
 
     def test_normalizes_check_digits_and_statement_period(self) -> None:
         result = _normalized_vendor_document(
@@ -109,6 +211,7 @@ class IngestValidationTests(unittest.TestCase):
                     "normalized": {
                         "type": "invoice",
                         "confidence": 0.93,
+                        "vendorConfidence": 0.55,
                         "vendorName": "ORION SOFTWARE INC.",
                         "amount": 1850.0,
                         "invoiceNumber": "INV-2041",
@@ -129,11 +232,12 @@ class IngestValidationTests(unittest.TestCase):
                 }
             },
         }
-        payload = prepare_bill(event)
+        payload = prepare_bill(event, Mock())
         self.assertEqual(payload["vendorId"], "ven-1")
         self.assertEqual(payload["vendorName"], "Orion Software LLC")
         self.assertEqual(payload["amount"], 1850.0)
         self.assertEqual(payload["glAccount"], "6300")
+        self.assertEqual(payload["confidence"], 0.55)
 
     def test_payout_is_saved_for_reconciliation_and_posted_to_ledger(self) -> None:
         repo = Mock()

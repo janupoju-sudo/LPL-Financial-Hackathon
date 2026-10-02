@@ -3,8 +3,11 @@
 The backend for the core loop is built and tested: upload → bill → rules → approval → ledger → mock payment. Keep building against your mocks until Jay deploys, then switch `NEXT_PUBLIC_USE_MOCKS=false`. **The response shapes match PLAN.md §5**, with a few extra fields.
 
 ## 1. Connect
+**Ownership:** Role E owns connecting and administering Amplify Hosting (E2), as assigned in [E's handoff](E-infra-data-pitch.md). Akshaya (A) owns the frontend environment configuration, build and deployed UI validation (A11). Jay owns the SAM stack and supplies its outputs. The repository connection is still unconfirmed until E provides the Amplify app/URL.
+
 - `NEXT_PUBLIC_API_URL` = `ApiUrl` from the [deploy outputs](README.md)
 - Cognito: `UserPoolId` + `UserPoolClientId` (Amplify UI `<Authenticator>` works)
+- Live environment: `NEXT_PUBLIC_USE_MOCKS=false` and `NEXT_PUBLIC_LOCAL_API=false`. Apply the three stack output values to `frontend/.env.local` for local testing and to the Amplify app's build environment. Restart/rebuild after changing public environment variables; deployed bundles embed them at build time.
 - Every request: `Authorization: Bearer <ID token>` (ID token, not access token)
 - Role = Cognito group, from `cognito:groups` in the ID token: `owner` · `partner` · `ops` · `lpl_bookkeeper`
 
@@ -56,3 +59,5 @@ Allowed types: `application/pdf`, `image/png`, `image/jpeg`, `image/tiff`.
 API amounts are **dollars** (numbers like `1850.0`). Format with `Intl.NumberFormat("en-US", {style: "currency", currency: "USD"})`.
 
 **Questions or blockers →** ping Jay with the request and the response body.
+
+**Demo naming:** the new marketing vendor is **Brightline Marketing**, matching `backend/scripts/seed.py`. Frontend mock invoices, bills, citations and vendor-document upload filenames use Brightline (`brightline-w9.pdf`, `brightline-void-check.pdf`).

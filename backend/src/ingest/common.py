@@ -73,7 +73,7 @@ def invoke_bedrock_json(prompt: str, document: dict[str, Any] | None = None) -> 
     response = boto3.client("bedrock-runtime").converse(
         modelId=bedrock_model_id(),
         messages=[{"role": "user", "content": content}],
-        inferenceConfig={"temperature": 0, "maxTokens": 1200},
+        inferenceConfig={"maxTokens": 1200},
     )
     blocks = response.get("output", {}).get("message", {}).get("content", [])
     text = "\n".join(
