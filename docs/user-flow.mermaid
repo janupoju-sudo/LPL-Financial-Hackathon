@@ -1,0 +1,55 @@
+flowchart TD
+    classDef page fill:#1e3a8a,stroke:#1e3a8a,color:#ffffff
+    classDef system fill:#f1f5f9,stroke:#94a3b8,color:#0f172a,stroke-dasharray: 4 3
+    classDef decision fill:#fef3c7,stroke:#d97706,color:#78350f
+    classDef outcome fill:#dcfce7,stroke:#16a34a,color:#14532d
+
+    LOGIN["Login"]:::page --> ROLE{"Role?"}:::decision
+    ROLE -->|Owner / Ops| DASH["Dashboard<br/>KPIs · P&L · Practice Value<br/>Needs your attention"]:::page
+    ROLE -->|Partner| BILLS
+
+    %% Navigation hub
+    DASH --> INBOX["Inbox / Upload"]:::page
+    DASH --> BILLS["Bills & Approvals"]:::page
+    DASH --> REV["Revenue"]:::page
+    DASH --> ASK["Ask your books"]:::page
+    DASH --> LIB["Library + Vendors"]:::page
+    DASH -.-> RULES["Rules (P1)"]:::page
+
+    %% Core loop: payables
+    subgraph LOOP1 ["Core loop 1 — Payables"]
+        INBOX -->|drop invoice / receipt| ING["AI: classify → extract → normalize → match vendor"]:::system
+        ING --> DOC["Document Detail<br/>fields · confidence · Recognized vendor"]:::page
+        DOC --> CONF{"Confidence ≥ 0.8?"}:::decision
+        CONF -->|No| REVIEW["Bills › Needs Review<br/>Ops fixes fields"]:::page
+        REVIEW --> BILL
+        CONF -->|Yes| BILL["Bill created"]:::system
+        BILL --> RULECHK{"Rules hit?<br/>> $1,000 · missing W-9"}:::decision
+        RULECHK -->|No| AUTO["Auto-approved"]:::outcome
+        RULECHK -->|Yes| PEND["Bills › Pending Approval"]:::page
+        PEND -->|Partner approves| POST["Posted to ledger<br/>→ Scheduled · mock pay"]:::outcome
+        PEND -->|Rejects| REJ["Rejected + audit trail"]:::system
+        AUTO --> POST
+    end
+
+    %% Vendor docs unblock bills
+    INBOX -->|drop void check / W-9| VEND["Vendor updated<br/>hasW9 · bank last 4"]:::system
+    VEND -.->|unblocks| PEND
+
+    %% Core loop: revenue
+    subgraph LOOP2 ["Core loop 2 — Revenue"]
+        INBOX -->|drop payout statement| PAY["AI: extract revenue lines"]:::system
+        PAY --> RECON["Reconcile vs expected"]:::system
+        RECON --> REV
+        REV --> FLAG["Variance flag<br/>Trail $412 short"]:::outcome
+    end
+
+    %% Payoffs
+    POST --> UPD["Financials recompute"]:::system
+    PAY --> UPD
+    UPD --> DASH
+    FLAG -.-> DASH
+
+    ASK -->|answer with citations| DOC
+    LIB --> DOC
+    LIB --> EXP["Export package<br/>docs ZIP + ledger CSV"]:::outcome
