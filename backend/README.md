@@ -69,8 +69,8 @@ Controls: no self-approval (uploader ≠ approver), one decision per task token 
 | GET | `/rules` | | rules (defaults seeded on first call) |
 | POST | `/rules` | `{name, condition, action, approverRole?, priority?, reason?}` | owner only |
 | PATCH | `/rules/{id}` | e.g. `{"enabled": false}` | owner only |
-| GET | `/financials` | `?period=2026-Q3` (or `2026-09`, `2026`) | `{period, pnl, balanceSheet, cashFlow, kpis:{margin, recurringPct, revPerClient, expenseRatios, previous}, valuation:{low, mid, high, method, ...}}` (D) |
-| GET | `/revenue/reconciliation` | `?period=2026-09` | `{period, expected, actual, variance, lines:[{id, label, source, ref, expected, actual, variance, status, docId, reason?}], flags:[...]}`; `status` = ok/short/over/missing/unexpected (D) |
+| GET | `/financials` | `?period=2026-Q3` (or `2026-09`, `2026`) | `{period, pnl:{revenue, expenses, netIncome, monthly[6], categories, revenueLines, expenseLines}, balanceSheet:{assets, liabilities, equity, ...Lines}, cashFlow:{operating, investing, financing, net, ...}, kpis:{margin, recurringPct, revPerClient, expenseRatios, previous}, valuation:{low, mid, high, method, ...}}`; percentages 0–100, matching `frontend/lib/types.ts` (D) |
+| GET | `/revenue/reconciliation` | `?period=2026-09` | `{period, expected, actual, variance, lines:[{id, label, source, ref, expected, actual, variance, status, docId, reason?}], flags:[{id, reason, docId, lineId, status, severity}]}`; `status` = ok/short/over/missing/unexpected (D) |
 | POST | `/ask` | `{question}` | `{answer, citations:[{documentId, label, snippet}], period}` (D) |
 | POST | `/export` | `{period}` | `{downloadUrl, documents, ledgerLines, missing}`; `downloadUrl` valid 15 min (D) |
 
