@@ -1,4 +1,4 @@
-import type { AccountLine, Financials, Reconciliation } from './types';
+import type { AccountLine, Bill, BillStatus, Document, Financials, Reconciliation, Rule, Vendor } from './types';
 
 /** Current main also accepts the earlier frontend shape. Normalize at the boundary;
  * ratio units follow the statement shape, never the magnitude of a KPI value. */
@@ -27,3 +27,31 @@ type MainReconciliation = Omit<Reconciliation, 'flags'> & { flags: (Omit<Reconci
 export function normalizeReconciliation(response: Reconciliation | MainReconciliation): Reconciliation {
   return { ...response, flags: response.flags.map(flag => ({ lineId: flag.lineId, status: flag.status, severity: flag.severity, message: flag.message ?? ('reason' in flag ? flag.reason : '') })) };
 }
+
+/* C's live API (backend/README.md) names ids per entity (documentId, billId, vendorId, ruleId),
+ * sends vendorName/documentId on bills, structured ruleHits, and calls the docs-hold action "hold".
+ * Map those to the frontend types at the boundary; mock fixtures already use the frontend shape. */
+type Hit = string | { ruleId?: string; name?: string; action?: string; reason?: string };
+export type ApiDocument = Omit<Document, 'id'> & { documentId: string; id?: string };
+export type ApiBill = Partial<Omit<Bill, 'ruleHits'>> & { billId: string; documentId?: string; vendorName?: string; glAccountName?: string; ruleHits?: Hit[] };
+export type ApiVendor = Omit<Vendor, 'id'> & { vendorId: string; id?: string };
+export type ApiRule = Omit<Rule, 'id' | 'action'> & { ruleId: string; id?: string; action: Rule['action'] | 'hold' };
+
+export const normalizeDocument = ({ documentId, ...doc }: ApiDocument): Document => ({ ...doc, id: doc.id ?? documentId });
+export function normalizeBill(bill: ApiBill): Bill {
+  const gl = bill.glAccount ?? '';
+  return {
+    id: bill.id ?? bill.billId,
+    docId: bill.docId ?? bill.documentId,
+    vendor: bill.vendor ?? bill.vendorName ?? '',
+    vendorId: bill.vendorId,
+    amount: Number(bill.amount ?? 0),
+    dueDate: bill.dueDate ?? '',
+    glAccount: bill.glAccountName && gl && !gl.includes('·') ? `${gl} · ${bill.glAccountName}` : gl,
+    status: bill.status as BillStatus,
+    ruleHits: (bill.ruleHits ?? []).map(hit => typeof hit === 'string' ? hit : hit.reason ?? hit.name ?? ''),
+  };
+}
+export const normalizeVendor = ({ vendorId, ...vendor }: ApiVendor): Vendor => ({ ...vendor, id: vendor.id ?? vendorId });
+export const normalizeRule = ({ ruleId, action, ...rule }: ApiRule): Rule => ({ ...rule, id: rule.id ?? ruleId, action: action === 'hold' ? 'require_docs' : action });
+export const toApiRule = (rule: Omit<Rule, 'id'>) => ({ ...rule, action: rule.action === 'require_docs' ? 'hold' : rule.action });

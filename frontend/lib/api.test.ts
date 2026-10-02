@@ -105,3 +105,25 @@ test('ZIP emits local records and a valid end-of-directory count', async () => {
   assert.equal(result.getUint32(result.byteLength - 22, true), 0x06054b50);
   assert.equal(result.getUint16(result.byteLength - 14, true), 1);
 });
+
+test('live API payloads (C backend shape) normalize to frontend types', async () => {
+  const { normalizeBill, normalizeDocument, normalizeRule, normalizeVendor, toApiRule } = await import('./contracts');
+  const doc = normalizeDocument({ documentId: 'doc-1', type: 'invoice', filename: 'orion.pdf', status: 'processed', vendorName: 'Orion Software', amount: 1850, createdAt: '2026-09-12T10:00:00Z', confidence: 0.94, extracted: {}, viewUrl: '' });
+  assert.equal(doc.id, 'doc-1');
+  assert.equal('documentId' in doc, false);
+  const bill = normalizeBill({
+    billId: 'bill-1', documentId: 'doc-1', vendorId: 'ven-1', vendorName: 'Brightline Marketing', amount: 650, dueDate: '2026-10-18',
+    glAccount: '6500', glAccountName: 'Marketing', status: 'pending_approval',
+    ruleHits: [{ ruleId: 'r-docs', name: 'Vendor docs', action: 'hold', reason: 'Vendor is missing a W-9 or void check' }, 'Legacy text hit'],
+  });
+  assert.deepEqual(bill, {
+    id: 'bill-1', docId: 'doc-1', vendor: 'Brightline Marketing', vendorId: 'ven-1', amount: 650, dueDate: '2026-10-18',
+    glAccount: '6500 · Marketing', status: 'pending_approval', ruleHits: ['Vendor is missing a W-9 or void check', 'Legacy text hit'],
+  });
+  assert.ok(bill.ruleHits.some(hit => hit.includes('missing')));   // the approve-button guard still works
+  assert.equal(normalizeVendor({ vendorId: 'ven-1', name: 'Orion', defaultGlAccount: '6300', hasW9: true, hasVoidCheck: true, billCount: 2 }).id, 'ven-1');
+  const rule = normalizeRule({ ruleId: 'r-docs', name: 'Vendor docs', condition: { field: 'vendor.hasW9', op: 'eq', value: false }, action: 'hold', approverRole: 'owner' });
+  assert.equal(rule.id, 'r-docs');
+  assert.equal(rule.action, 'require_docs');
+  assert.equal(toApiRule({ ...rule, action: 'require_docs' }).action, 'hold');
+});
