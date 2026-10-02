@@ -135,3 +135,6 @@ html[data-theme="dark"] .skeleton { background: linear-gradient(90deg, var(--bg-
 .history-link { display: inline-flex; margin-top: 8px; font-size: 10px; }
 .inbox-footnote { margin: 4px 0 24px; font-size: 12px; }
 @media (max-width: 680px) { .bill-facts { grid-template-columns: 1fr; } }
+
+.rule-actions { display: flex; align-items: center; gap: 8px; margin-top: 14px; flex-wrap: wrap; font-size: 11px; }
+.rule-actions .button { font-size: 11px; padding: 6px 10px; }

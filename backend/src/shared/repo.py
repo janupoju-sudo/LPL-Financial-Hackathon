@@ -233,7 +233,9 @@ def list_rules(practice_id, seed_defaults=True):
         for rule in DEFAULT_RULES:
             put_rule(practice_id, rule)
         rules = query_prefix(practice_id, "RULE#")
-    return sorted(rules, key=lambda r: r.get("priority", 100))
+    # Deleted rules stay stored for the audit trail but are hidden and never evaluated.
+    # Checking the raw list above means deleting every rule doesn't re-seed the defaults.
+    return sorted((r for r in rules if not r.get("deleted")), key=lambda r: r.get("priority", 100))
 
 
 def put_rule(practice_id, rule: dict):

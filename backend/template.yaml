@@ -150,7 +150,7 @@ Resources:
       CorsConfiguration:
         AllowOrigins: ["*"]
         AllowHeaders: [authorization, content-type]
-        AllowMethods: [GET, POST, PATCH, OPTIONS]
+        AllowMethods: [GET, POST, PATCH, DELETE, OPTIONS]
         MaxAge: 600
       Auth:
         DefaultAuthorizer: CognitoJwt
@@ -215,6 +215,7 @@ Resources:
         ListRules: { Type: HttpApi, Properties: { ApiId: !Ref HttpApi, Path: /rules, Method: GET } }
         CreateRule: { Type: HttpApi, Properties: { ApiId: !Ref HttpApi, Path: /rules, Method: POST } }
         UpdateRule: { Type: HttpApi, Properties: { ApiId: !Ref HttpApi, Path: "/rules/{id}", Method: PATCH } }
+        DeleteRule: { Type: HttpApi, Properties: { ApiId: !Ref HttpApi, Path: "/rules/{id}", Method: DELETE } }
 
   # C11: card CSV import -> categorized j-card-* journals + receipt matching
   TransactionsFunction:
