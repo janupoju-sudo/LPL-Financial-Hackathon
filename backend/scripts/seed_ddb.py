@@ -1,201 +1,506 @@
-"""E7: ledger history for Harbor Point Wealth, on top of scripts/seed.py.
+"""Seed Harbor Point Wealth ledger history and demo source-document metadata.
 
-    python scripts/seed.py     --table ledgerline-dev     # practice, vendors, rules (run first)
-    python scripts/seed_ddb.py --check                    # show the numbers, no AWS
-    python scripts/seed_ddb.py --table ledgerline-dev     # write the history
+Offline checks never access AWS. A write requires ``--table`` and one of these
+September policies:
 
-Twelve complete months, Sep 2025 through Aug 2026, in D's agreed format
-(backend/README.md, "Contract for D"). Every journal balances and goes in as one
-DynamoDB transaction.
+* default: seed history through August, leaving September untouched;
+* ``--live-sept``: add September operating expenses, but no payout or REV# lines;
+* ``--include-sept``: add September expenses and the fictional fallback payout.
 
-September 2026 is deliberately EMPTY - no revenue, no expenses. The demo builds it
-live: approving a bill posts the Sept expense, uploading the payout statement posts
-the Sept revenue and the RevenueLines reconciliation reads. Seeding Sept here would
-double-count against B's ingest and the $412 flag would not fire.
-
-The window ends in August on purpose. A period ending Aug 2026 covers 12 full months,
-so D's valuation reports a true trailing twelve months instead of annualizing a part
-year. Point the dashboard at 2026-08 (or 2026-Q3 once the demo has filled September).
-Pass --include-sept for a fallback that seeds Sept revenue if the live upload is
-flaky on the day.
-
-post_journal skips a journal id it has already written, so re-running is safe. To
-change seeded history, delete the LEDGER# items first (scripts/reset_demo.py).
+The fallback refuses to post when September payout data already exists. Existing
+journal IDs make repeated runs idempotent. Legacy July/August aggregate expense
+journals are detected rather than duplicated; those require an explicit migration.
 """
 import argparse
 import os
 import sys
 from datetime import date
+from decimal import Decimal
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-# ---------------------------------------------------------------------------
-# The practice, in dollars. Revenue mirrors the feeSchedule in scripts/seed.py,
-# so the dashboard and the reconciliation tell the same story.
-# ---------------------------------------------------------------------------
-MONTHLY_REVENUE = {           # -> 4100 advisory, 4200 commissions, 4300 trails
-    "advisory": 182_400,      # recurring
-    "commission": 14_200,     # NOT recurring - keeps recurring % honest, not 100%
-    "trail": 6_150,           # recurring
+MONTHLY_REVENUE = {
+    "advisory": 182_400,
+    "commission": 14_200,
+    "trail": 6_150,
 }
-VA_TRAIL_QUARTERLY = 2_890    # contract ...4471, billed in Mar/Jun/Sep/Dec
+VA_TRAIL_QUARTERLY = 2_890
+SEPT_VA_ACTUAL = 2_478
 QUARTER_MONTHS = (3, 6, 9, 12)
 
 MONTHLY_EXPENSES = {
-    "6100": 86_000,   # staff and payroll
-    "6200": 9_800,    # rent and occupancy
-    "6300": 7_400,    # technology
-    "6400": 21_500,   # LPL platform fees
-    "6500": 5_200,    # marketing
-    "6600": 3_100,    # compliance and licensing
-    "6700": 2_900,    # travel and entertainment
-    "6900": 1_800,    # other
+    "6100": 86_000,
+    "6200": 9_800,
+    "6300": 7_400,
+    "6400": 21_500,
+    "6500": 5_200,
+    "6600": 3_100,
+    "6700": 2_900,
+    "6900": 1_800,
 }
-
-# Seasonality, so the P&L chart has a shape instead of a flat line.
 SEASONAL = {
-    "6500": {1: 1.8, 9: 1.8, 12: 0.7},        # campaigns in Jan and Sep
-    "6700": {5: 2.2, 10: 2.2, 1: 0.5, 2: 0.5},  # conference season
+    "6500": {1: 1.8, 9: 1.8, 12: 0.7},
+    "6700": {5: 2.2, 10: 2.2, 1: 0.5, 2: 0.5},
 }
-DECEMBER_BONUS = 25_000       # added to 6100 in December
-MONTHLY_DISTRIBUTION = 30_000  # owner draw: equity, so it does not touch margin
+DECEMBER_BONUS = 25_000
+MONTHLY_DISTRIBUTION = 30_000
 OPENING_CASH = 150_000
 
 START = (2025, 9)
-END = (2026, 8)          # Sept 2026 is left empty for the live demo
+END = (2026, 8)
 SEPT_DEMO = (2026, 9)
+SOURCE_START = (2025, 9)
+LEASE_DOC_ID = "doc_lease_amendment_2026_07"
+SEPT_PAYOUT_DOC_ID = "doc_lpl_payout_statement_sep_2026"
 
 
 def months(first, last):
-    y, m = first
-    while (y, m) <= last:
-        yield y, m
-        y, m = (y + 1, 1) if m == 12 else (y, m + 1)
+    year, month = first
+    while (year, month) <= last:
+        yield year, month
+        year, month = (year + 1, 1) if month == 12 else (year, month + 1)
 
 
-def month_end(y, m):
-    return date(y + (m == 12), 1 if m == 12 else m + 1, 1).toordinal() - 1
+def month_end(year, month):
+    return date(year + (month == 12), 1 if month == 12 else month + 1, 1).toordinal() - 1
 
 
-def expenses_for(m):
-    out = {}
-    for acct, base in MONTHLY_EXPENSES.items():
-        amount = base * SEASONAL.get(acct, {}).get(m, 1.0)
-        if acct == "6100" and m == 12:
-            amount += DECEMBER_BONUS
-        out[acct] = round(amount, 2)
-    return out
+def month_tag(year, month):
+    return f"{year}-{month:02d}"
 
 
-def build(include_sept=False):
-    """Every journal as (journal_id, date_iso, lines, memo). No AWS."""
+def payout_doc_id(year, month):
+    return f"doc_lpl_payout_{year}_{month:02d}"
+
+
+def compliance_doc_id(year, month):
+    return f"doc_compliance_invoice_{year}_{month:02d}"
+
+
+def expenses_for(year, month):
+    """Return monthly expenses in dollars, preserving historic seasonality."""
+    out = {
+        account: base * SEASONAL.get(account, {}).get(month, 1.0)
+        for account, base in MONTHLY_EXPENSES.items()
+    }
+    if month == 12:
+        out["6100"] += DECEMBER_BONUS
+    if (year, month) >= (2026, 7):
+        out["6200"] = 12_200
+        out["6600"] += 2_550
+    return {account: round(amount, 2) for account, amount in out.items()}
+
+
+def payout_revenue_lines(year, month, doc_id, fallback=False):
+    """Return normalized payout lines; actual amounts are integer cents."""
+    lines = [
+        {"id": f"{doc_id}-01", "source": "advisory", "label": "Advisory fees",
+         "actual": MONTHLY_REVENUE["advisory"] * 100},
+        {"id": f"{doc_id}-02", "source": "commission", "label": "Mutual fund commissions",
+         "actual": MONTHLY_REVENUE["commission"] * 100},
+        {"id": f"{doc_id}-03", "source": "trail", "ref": "12b1",
+         "label": "Monthly 12b-1 trails", "actual": MONTHLY_REVENUE["trail"] * 100},
+    ]
+    if month in QUARTER_MONTHS:
+        va_actual = SEPT_VA_ACTUAL if fallback and (year, month) == SEPT_DEMO else VA_TRAIL_QUARTERLY
+        lines.append({
+            "id": f"{doc_id}-04",
+            "source": "trail",
+            "ref": "4471",
+            "label": "Variable annuity trail, contract 4471",
+            "actual": va_actual * 100,
+        })
+    return lines
+
+
+def payout_journal_lines(revenue_lines):
+    from shared import ledger
+
+    cents_by_source = {}
+    for line in revenue_lines:
+        cents_by_source[line["source"]] = cents_by_source.get(line["source"], 0) + line["actual"]
+    dollars_by_source = {
+        source: Decimal(cents) / Decimal(100)
+        for source, cents in cents_by_source.items()
+    }
+    return ledger.payout_lines(dollars_by_source)
+
+
+def _source_document(practice_id, doc_id, filename, doc_type, created_at, **fields):
+    return {
+        "documentId": doc_id,
+        "filename": filename,
+        "contentType": "application/pdf",
+        "s3Key": f"uploads/{practice_id}/{doc_id}/{filename}",
+        "status": "pending_upload",
+        "type": doc_type,
+        "uploadedBy": "role-e-seed",
+        "createdAt": created_at,
+        **fields,
+    }
+
+
+def source_documents(practice_id, include_sept=False):
+    """Stable document metadata for local PDFs; S3 objects are not uploaded here."""
+    documents = []
+    for year, month in months(SOURCE_START, END):
+        tag = month_tag(year, month)
+        doc_id = payout_doc_id(year, month)
+        actual = payout_revenue_lines(year, month, doc_id)
+        total_cents = sum(line["actual"] for line in actual)
+        documents.append(_source_document(
+            practice_id,
+            doc_id,
+            f"lpl_payout_statement_{tag}.pdf",
+            "payout_statement",
+            f"{tag}-01T00:00:00+00:00",
+            period=tag,
+            amount=total_cents / 100,
+        ))
+
+    documents.append(_source_document(
+        practice_id,
+        LEASE_DOC_ID,
+        "lease_amendment_effective_2026-07-01.pdf",
+        "invoice",
+        "2026-07-01T00:00:00+00:00",
+        vendorName="Harbor Point Properties (FICTIONAL)",
+        amount=12_200.00,
+    ))
+    for month in (7, 8, 9):
+        tag = month_tag(2026, month)
+        doc_id = compliance_doc_id(2026, month)
+        documents.append(_source_document(
+            practice_id,
+            doc_id,
+            f"compliance_consultant_invoice_{tag}.pdf",
+            "invoice",
+            f"{tag}-05T00:00:00+00:00",
+            vendorName="Clearwater Compliance Advisors (FICTIONAL)",
+            amount=2_550.00,
+        ))
+
+    if include_sept:
+        documents.append(_source_document(
+            practice_id,
+            SEPT_PAYOUT_DOC_ID,
+            "lpl_payout_statement_sep_2026.pdf",
+            "payout_statement",
+            "2026-09-30T00:00:00+00:00",
+            period="2026-09",
+            amount=205_228.00,
+        ))
+    return documents
+
+
+def build(include_sept=False, live_sept=False):
+    """Build (journal_id, date, lines, memo, source_doc_id) tuples without AWS."""
     from shared import coa, ledger
 
+    if include_sept and live_sept:
+        raise ValueError("Choose either --live-sept or --include-sept, not both")
+
     out = []
-    first_y, first_m = START
-    opening = date(first_y, first_m, 1).replace(day=1).toordinal() - 1
+    opening = date(START[0], START[1], 1).toordinal() - 1
     out.append((
-        "j-opening-balance", date.fromordinal(opening).isoformat(),
+        "j-opening-balance",
+        date.fromordinal(opening).isoformat(),
         [{"account": coa.CASH, "debit": ledger.to_cents(OPENING_CASH)},
          {"account": "3000", "credit": ledger.to_cents(OPENING_CASH)}],
         "Opening balance",
+        None,
     ))
 
-    for y, m in months(START, END):
-        d = date.fromordinal(month_end(y, m)).isoformat()
-        tag = f"{y}-{m:02d}"
+    for year, month in months(START, END):
+        tag = month_tag(year, month)
+        entry_date = date.fromordinal(month_end(year, month)).isoformat()
+        doc_id = payout_doc_id(year, month)
+        revenue_lines = payout_revenue_lines(year, month, doc_id)
+        out.append((
+            f"j-payout-{tag}", entry_date, payout_journal_lines(revenue_lines),
+            f"LPL payout statement {tag}", doc_id,
+        ))
 
-        rev = dict(MONTHLY_REVENUE)
-        if m in QUARTER_MONTHS:
-            rev["trail"] += VA_TRAIL_QUARTERLY
-        out.append((f"j-payout-{tag}", d, ledger.payout_lines(rev),
-                    f"LPL payout statement {tag}"))
-
-        exp = expenses_for(m)
-        total = sum(ledger.to_cents(v) for v in exp.values())
-        lines = [{"account": a, "debit": ledger.to_cents(v)} for a, v in sorted(exp.items())]
-        lines.append({"account": coa.ACCOUNTS_PAYABLE, "credit": total})
-        out.append((f"j-expenses-{tag}", d, lines, f"Operating expenses {tag}"))
-        out.append((f"j-exp-paid-{tag}", d,
+        expenses = expenses_for(year, month)
+        split_sources = (year, month) >= (2026, 7)
+        if split_sources:
+            rent = expenses.pop("6200")
+            compliance = expenses.pop("6600")
+        total = sum(ledger.to_cents(amount) for amount in expenses.values())
+        expense_lines = [
+            {"account": account, "debit": ledger.to_cents(amount)}
+            for account, amount in sorted(expenses.items())
+        ]
+        expense_lines.append({"account": coa.ACCOUNTS_PAYABLE, "credit": total})
+        out.append((f"j-expenses-{tag}", entry_date, expense_lines,
+                    f"Operating expenses {tag}", None))
+        out.append((f"j-exp-paid-{tag}", entry_date,
                     [{"account": coa.ACCOUNTS_PAYABLE, "debit": total},
                      {"account": coa.CASH, "credit": total}],
-                    f"Paid operating expenses {tag}"))
+                    f"Paid operating expenses {tag}", None))
 
-        out.append((f"j-distribution-{tag}", d,
+        if split_sources:
+            for label, account, amount, source_doc in (
+                ("rent", "6200", rent, LEASE_DOC_ID),
+                ("compliance", "6600", compliance, compliance_doc_id(year, month)),
+            ):
+                cents = ledger.to_cents(amount)
+                out.append((
+                    f"j-expense-{label}-{tag}", entry_date,
+                    [{"account": account, "debit": cents},
+                     {"account": coa.ACCOUNTS_PAYABLE, "credit": cents}],
+                    f"{label.title()} expense {tag}", source_doc,
+                ))
+                out.append((
+                    f"j-expense-paid-{label}-{tag}", entry_date,
+                    [{"account": coa.ACCOUNTS_PAYABLE, "debit": cents},
+                     {"account": coa.CASH, "credit": cents}],
+                    f"Paid {label} expense {tag}", source_doc,
+                ))
+
+        out.append((f"j-distribution-{tag}", entry_date,
                     [{"account": "3100", "debit": ledger.to_cents(MONTHLY_DISTRIBUTION)},
                      {"account": coa.CASH, "credit": ledger.to_cents(MONTHLY_DISTRIBUTION)}],
-                    f"Owner distribution {tag}"))
+                    f"Owner distribution {tag}", None))
 
-    if include_sept:
-        y, m = SEPT_DEMO
-        d = date.fromordinal(month_end(y, m)).isoformat()
-        rev = dict(MONTHLY_REVENUE)
-        rev["trail"] += VA_TRAIL_QUARTERLY
-        out.append((f"j-payout-{y}-{m:02d}", d, ledger.payout_lines(rev),
-                    f"LPL payout statement {y}-{m:02d} (seeded fallback)"))
+    if include_sept or live_sept:
+        year, month = SEPT_DEMO
+        tag = month_tag(year, month)
+        entry_date = date.fromordinal(month_end(year, month)).isoformat()
+        expenses = expenses_for(year, month)
+        rent = expenses.pop("6200")
+        compliance = expenses.pop("6600")
+        total = sum(ledger.to_cents(amount) for amount in expenses.values())
+        lines = [{"account": account, "debit": ledger.to_cents(amount)}
+                 for account, amount in sorted(expenses.items())]
+        lines.append({"account": coa.ACCOUNTS_PAYABLE, "credit": total})
+        out.extend([
+            (f"j-expenses-{tag}", entry_date, lines, f"Operating expenses {tag}", None),
+            (f"j-exp-paid-{tag}", entry_date,
+             [{"account": coa.ACCOUNTS_PAYABLE, "debit": total},
+              {"account": coa.CASH, "credit": total}],
+             f"Paid operating expenses {tag}", None),
+        ])
+        for label, account, amount, source_doc in (
+            ("rent", "6200", rent, LEASE_DOC_ID),
+            ("compliance", "6600", compliance, compliance_doc_id(year, month)),
+        ):
+            cents = ledger.to_cents(amount)
+            out.extend([
+                (f"j-expense-{label}-{tag}", entry_date,
+                 [{"account": account, "debit": cents},
+                  {"account": coa.ACCOUNTS_PAYABLE, "credit": cents}],
+                 f"{label.title()} expense {tag}", source_doc),
+                (f"j-expense-paid-{label}-{tag}", entry_date,
+                 [{"account": coa.ACCOUNTS_PAYABLE, "debit": cents},
+                  {"account": coa.CASH, "credit": cents}],
+                 f"Paid {label} expense {tag}", source_doc),
+            ])
+        out.append((f"j-distribution-{tag}", entry_date,
+                    [{"account": "3100", "debit": ledger.to_cents(MONTHLY_DISTRIBUTION)},
+                     {"account": coa.CASH, "credit": ledger.to_cents(MONTHLY_DISTRIBUTION)}],
+                    f"Owner distribution {tag}", None))
+
+        if include_sept:
+            lines = payout_revenue_lines(year, month, SEPT_PAYOUT_DOC_ID, fallback=True)
+            out.append((f"j-payout-{tag}", entry_date, payout_journal_lines(lines),
+                        f"LPL payout statement {tag} (fallback)", SEPT_PAYOUT_DOC_ID))
     return out
 
 
-def check(include_sept=False):
-    """Print what the dashboard will show, using D's real code. No AWS."""
-    os.environ.setdefault("TABLE_NAME", "unused-for-check")
+def revenue_records(include_sept=False):
+    records = []
+    for year, month in months(START, END):
+        doc_id = payout_doc_id(year, month)
+        records.append((month_tag(year, month), doc_id,
+                        payout_revenue_lines(year, month, doc_id)))
+    if include_sept:
+        records.append(("2026-09", SEPT_PAYOUT_DOC_ID,
+                        payout_revenue_lines(2026, 9, SEPT_PAYOUT_DOC_ID, fallback=True)))
+    return records
+
+
+def has_september_payout(practice_id):
+    """Detect either normalized payout lines or a posted live payout journal."""
+    from shared import ddb
+
+    if ddb.get_revenue_lines(practice_id, "2026-09"):
+        return True
+    return any(
+        line.get("sourceType") == "payout" or str(line.get("journalId", "")).startswith("j-payout-")
+        for line in ddb.query_prefix(practice_id, "LEDGER#2026-09#")
+    )
+
+
+def _reject_legacy_split_expenses(practice_id):
+    from shared import ddb
+
+    for month in (7, 8):
+        tag = month_tag(2026, month)
+        old_lines = ddb.query_prefix(practice_id, f"LEDGER#2026-{month:02d}#j-expenses-{tag}#")
+        if any(line.get("account") in {"6200", "6600"} for line in old_lines):
+            raise RuntimeError(
+                f"Legacy {tag} aggregate expense journal already includes rent/compliance; "
+                "refusing to add split journals and double-count. Migrate that month first."
+            )
+
+
+def seed(practice_id, include_sept=False, live_sept=False):
+    """Write seed rows. This is only called by the --table path, never --check."""
+    from shared import ddb, ledger, repo
+
+    if include_sept and live_sept:
+        raise ValueError("Choose either --live-sept or --include-sept, not both")
+    _reject_legacy_split_expenses(practice_id)
+
+    fallback_active = include_sept
+    if fallback_active and has_september_payout(practice_id):
+        print("September payout data already exists; skipping fallback payout and REV# records.")
+        fallback_active = False
+
+    sept_mode = include_sept or live_sept
+    for document in source_documents(practice_id, include_sept=fallback_active):
+        if not ddb.get_item(practice_id, f"DOC#{document['documentId']}"):
+            ddb.put_item(practice_id, f"DOC#{document['documentId']}", document)
+
+    for journal_id, entry_date, lines, memo, source_doc_id in build(
+        include_sept=fallback_active, live_sept=sept_mode and not fallback_active
+    ):
+        ledger.post_journal(
+            practice_id, journal_id, entry_date, lines, memo,
+            source_doc_id=source_doc_id,
+            source_type="seed",
+            source_id=source_doc_id,
+        )
+
+    for period, doc_id, lines in revenue_records(include_sept=fallback_active):
+        repo.put_revenue_lines(practice_id, period, doc_id, lines)
+
+    print(f"Posted history and {('fallback' if fallback_active else 'live' if live_sept else 'no')} September mode.")
+    print("Source-document S3 objects remain pending upload; local seed PDFs are not cloud files.")
+
+
+def _entries(include_sept=False, live_sept=False):
     from shared import ledger
-    from financials import kpis, statements, valuation
 
     entries = []
-    for jid, d, lines, memo in build(include_sept):
-        entries.extend(ledger.build_journal(jid, d, lines, memo))
-    print(f"{len(entries)} ledger lines across {len(build(include_sept))} journals, all balanced.\n")
+    journals = build(include_sept=include_sept, live_sept=live_sept)
+    for journal_id, entry_date, lines, memo, source_doc_id in journals:
+        entries.extend(ledger.build_journal(
+            journal_id, entry_date, lines, memo, source_doc_id,
+            source_type="seed", source_id=source_doc_id,
+        ))
+    return entries, len(journals)
 
-    as_of = date(2026, 8, 31)
-    for period in ("2026-07", "2026-08", "2026-Q2"):
-        pnl = statements.profit_and_loss(entries, period)
-        k = kpis.compute(pnl, 180)
-        print(f"  {period:9} revenue ${pnl['totalRevenue']/100:>12,.0f}   "
-              f"expenses ${pnl['totalExpenses']/100:>11,.0f}   "
-              f"margin {k['margin']:.1%}   recurring {k['recurringPct']:.1%}")
 
-    pnl = statements.profit_and_loss(entries, "2026-08")
-    k = kpis.compute(pnl, 180)
-    v = valuation.estimate(entries, as_of, k["recurringPct"], k["margin"], 0.22)
-    print(f"\n  Estimated practice value  ${v['low']/100:,.0f} - ${v['high']/100:,.0f}"
-          f"   (mid ${v['mid']/100:,.0f})")
-    print(f"  Multiples {v['multiples']}")
-    print(f"  Method: {v['method']}\n")
+def _margin(entries, period):
+    from financials import kpis, statements
 
-    bs = statements.balance_sheet(entries, as_of)
-    diff = bs["totalAssets"] - (bs["totalLiabilities"] + bs["totalEquity"])
-    print(f"  Balance sheet: assets ${bs['totalAssets']/100:,.0f} = "
-          f"liabilities ${bs['totalLiabilities']/100:,.0f} + equity ${bs['totalEquity']/100:,.0f}"
-          f"   {'BALANCED' if diff == 0 else f'OFF BY {diff}'}")
-    if not include_sept:
-        print("\n  September 2026 is empty on purpose - the demo fills it live.")
-        print("  Use --include-sept as a fallback if the upload is flaky on the day.")
-    return diff == 0
+    pnl = statements.profit_and_loss(entries, period)
+    return pnl, kpis.compute(pnl, 180)
+
+
+def _fallback_reconciliation():
+    from financials.reconciliation import compute
+
+    schedule = [
+        {"id": "adv", "label": "Advisory fees", "source": "advisory",
+         "basis": "fixed", "amount": 18_240_000, "frequency": "monthly"},
+        {"id": "mf-comm", "label": "Mutual fund commissions", "source": "commission",
+         "basis": "fixed", "amount": 1_420_000, "frequency": "monthly"},
+        {"id": "12b1", "label": "12b-1 trails", "source": "trail", "ref": "12b1",
+         "basis": "fixed", "amount": 615_000, "frequency": "monthly"},
+        {"id": "va-4471", "label": "Variable annuity trail, contract 4471",
+         "source": "trail", "ref": "4471", "basis": "aum", "aum": 115_600_000,
+         "annualRate": 0.01, "frequency": "quarterly", "billingMonths": [3, 6, 9, 12]},
+    ]
+    lines = payout_revenue_lines(2026, 9, SEPT_PAYOUT_DOC_ID, fallback=True)
+    return compute(schedule, lines, "2026-09")
+
+
+def check(include_sept=False, live_sept=False):
+    """Print local financial checks only. This function makes no AWS calls."""
+    if include_sept and live_sept:
+        raise ValueError("Choose either --live-sept or --include-sept, not both")
+    os.environ.setdefault("TABLE_NAME", "unused-for-check")
+    from financials import statements, valuation
+
+    entries, journal_count = _entries(include_sept, live_sept)
+    print(f"{len(entries)} ledger lines across {journal_count} journals, all balanced.\n")
+
+    q2_pnl, q2 = _margin(entries, "2026-Q2")
+    live_entries, _ = _entries(live_sept=True)
+    q3_partial_pnl, q3_partial = _margin(live_entries, "2026-Q3")
+    fallback_entries, _ = _entries(include_sept=True)
+    q3_complete_pnl, q3_complete = _margin(fallback_entries, "2026-Q3")
+
+    def show_margin(label, pnl, kpis):
+        print(f"  {label:43} revenue ${pnl['totalRevenue']/100:>11,.0f}   "
+              f"expenses ${pnl['totalExpenses']/100:>10,.0f}   margin {kpis['margin']:.1%}")
+
+    show_margin("2026-Q2 complete", q2_pnl, q2)
+    show_margin("2026-Q3 partial (live seed; payout pending)", q3_partial_pnl, q3_partial)
+    show_margin("2026-Q3 complete (fallback payout included)", q3_complete_pnl, q3_complete)
+
+    reconciliation = _fallback_reconciliation()
+    va_line = next(line for line in reconciliation["lines"] if line.get("ref") == "4471")
+    print("\n  2026-09 contract 4471 fallback: "
+          f"expected {va_line['expected']} cents, actual {va_line['actual']} cents, "
+          f"variance {va_line['variance']} cents")
+
+    selected_entries = live_entries if live_sept else fallback_entries if include_sept else entries
+    selected_as_of = date(2026, 9, 30) if include_sept or live_sept else date(2026, 8, 31)
+    selected_pnl, selected_kpis = _margin(selected_entries, "2026-08")
+    value = valuation.estimate(
+        selected_entries, selected_as_of, selected_kpis["recurringPct"], selected_kpis["margin"], 0.22
+    )
+    print(f"\n  Estimated practice value  ${value['low']/100:,.0f} - ${value['high']/100:,.0f}"
+          f"   (mid ${value['mid']/100:,.0f})")
+
+    balance = statements.balance_sheet(selected_entries, selected_as_of)
+    difference = balance["totalAssets"] - (balance["totalLiabilities"] + balance["totalEquity"])
+    print(f"  Balance sheet: assets ${balance['totalAssets']/100:,.0f} = "
+          f"liabilities ${balance['totalLiabilities']/100:,.0f} + equity ${balance['totalEquity']/100:,.0f}"
+          f"   {'BALANCED' if difference == 0 else f'OFF BY {difference}'}")
+
+    complete_q3_is_lower = q3_complete["margin"] < q2["margin"]
+    fallback_is_correct = (
+        va_line["expected"] == 289_000
+        and va_line["actual"] == 247_800
+        and va_line["variance"] == -41_200
+    )
+    print(f"  Complete Q3 margin below Q2: {'YES' if complete_q3_is_lower else 'NO'}")
+    print("\nPass --table <name> to write; --check never contacts AWS.")
+    return difference == 0 and complete_q3_is_lower and fallback_is_correct
 
 
 def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--table")
-    ap.add_argument("--practice", default="p1")
-    ap.add_argument("--check", action="store_true", help="show the numbers, write nothing")
-    ap.add_argument("--include-sept", action="store_true",
-                    help="also seed September 2026 revenue (fallback if the live upload fails)")
-    a = ap.parse_args()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--table")
+    parser.add_argument("--practice", default="p1")
+    parser.add_argument("--check", action="store_true", help="show the numbers, write nothing")
+    september = parser.add_mutually_exclusive_group()
+    september.add_argument(
+        "--live-sept", action="store_true",
+        help="seed September operating expenses only; leave payout ingestion empty",
+    )
+    september.add_argument(
+        "--include-sept", action="store_true",
+        help="seed September expenses and fallback payout if live payout data is absent",
+    )
+    args = parser.parse_args()
 
-    if a.check or not a.table:
-        ok = check(a.include_sept)
-        if not a.table:
+    if args.check or not args.table:
+        ok = check(args.include_sept, args.live_sept)
+        if not args.table:
             print("\nPass --table <name> to write.")
         sys.exit(0 if ok else 1)
 
-    os.environ["TABLE_NAME"] = a.table
-    from shared import ledger
-    journals = build(a.include_sept)
-    for jid, d, lines, memo in journals:
-        ledger.post_journal(a.practice, jid, d, lines, memo, source_type="seed")
-    print(f"Posted {len(journals)} journals to {a.table} for practice {a.practice}.")
-    print("Re-running is safe: existing journal ids are skipped.")
+    os.environ["TABLE_NAME"] = args.table
+    try:
+        seed(args.practice, include_sept=args.include_sept, live_sept=args.live_sept)
+    except RuntimeError as error:
+        parser.error(str(error))
 
 
 if __name__ == "__main__":
