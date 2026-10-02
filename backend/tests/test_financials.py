@@ -1,8 +1,8 @@
 import unittest
 from datetime import date
 
-from functions.financials import api, kpis, periods, statements, valuation
-from tests.fixtures import PRACTICE, sample_entries
+from financials import api, kpis, periods, statements, valuation
+from fixtures import PRACTICE, sample_entries
 
 
 class Periods(unittest.TestCase):
@@ -91,8 +91,23 @@ class Api(unittest.TestCase):
             self.assertIn(key, r["kpis"])
         for key in ("low", "mid", "high", "method"):
             self.assertIn(key, r["valuation"])
-        self.assertIsInstance(r["pnl"]["totalRevenue"], float)
+        self.assertIsInstance(r["pnl"]["revenue"], float)
         self.assertEqual(r["kpis"]["previous"]["period"], "2026-Q2")
+
+    def test_matches_frontend_contract(self):
+        """Fields frontend/lib/types.ts reads: totals as numbers, percentages 0–100, 6-month chart."""
+        r = api.build_financials(sample_entries(), "2026-Q3", PRACTICE)
+        p, bs, cf, k = r["pnl"], r["balanceSheet"], r["cashFlow"], r["kpis"]
+        self.assertAlmostEqual(p["netIncome"], p["revenue"] - p["expenses"], places=2)
+        self.assertEqual([m["month"] for m in p["monthly"]], ["Apr", "May", "Jun", "Jul", "Aug", "Sep"])
+        self.assertAlmostEqual(sum(m["revenue"] for m in p["monthly"][3:]), p["revenue"], places=2)
+        self.assertEqual({c["name"] for c in p["categories"]} >= {"Rent and occupancy"}, True)
+        self.assertAlmostEqual(bs["assets"], bs["liabilities"] + bs["equity"], places=2)
+        self.assertAlmostEqual(cf["net"], cf["operating"] + cf["investing"] + cf["financing"], places=2)
+        self.assertTrue(1 < k["margin"] < 100 and 1 < k["recurringPct"] <= 100)
+        self.assertEqual(k["margin"], round(k["margin"], 1))
+        for key in ("low", "mid", "high", "method"):
+            self.assertIn(key, r["valuation"])
 
 
 if __name__ == "__main__":

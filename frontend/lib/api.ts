@@ -5,7 +5,8 @@ import rulesFixture from '@/mocks/rules.json';
 import financialsFixture from '@/mocks/financials.json';
 import reconciliationFixture from '@/mocks/reconciliation.json';
 import askFixture from '@/mocks/ask.json';
-import type { Answer, Bill, Document, Financials, Reconciliation, Role, Rule, Vendor } from './types';
+import type { Answer, Bill, Document, ExportResult, Financials, Reconciliation, Role, Rule, Vendor } from './types';
+import { normalizeFinancials, normalizeReconciliation, type LegacyFinancials } from './contracts';
 
 export const USE_MOCKS = process.env.NEXT_PUBLIC_USE_MOCKS !== 'false';
 const baseUrl = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, '');
@@ -22,7 +23,7 @@ async function request<T>(path: string, body?: unknown): Promise<T> {
   if (!baseUrl) throw new Error('Set NEXT_PUBLIC_API_URL to connect to the backend.');
   const { fetchAuthSession } = await import('aws-amplify/auth');
   const session = await fetchAuthSession();
-  const token = session.tokens?.accessToken.toString();
+  const token = session.tokens?.idToken?.toString();
   if (!token) throw new Error('Please sign in again.');
   const response = await fetch(`${baseUrl}${path}`, { method: body === undefined ? 'GET' : 'POST', headers: { Authorization: `Bearer ${token}`, ...(body === undefined ? {} : { 'Content-Type': 'application/json' }) }, body: body === undefined ? undefined : JSON.stringify(body) });
   if (!response.ok) throw new Error(`Request failed (${response.status}): ${(await response.text()).slice(0, 200)}`);
@@ -34,8 +35,8 @@ export const api = {
   bills: () => USE_MOCKS ? Promise.resolve(clone(bills)) : request<Bill[]>('/bills'),
   vendors: () => USE_MOCKS ? Promise.resolve(clone(vendors)) : request<Vendor[]>('/vendors'),
   rules: () => USE_MOCKS ? Promise.resolve(clone(rules)) : request<Rule[]>('/rules'),
-  financials: (period: string) => USE_MOCKS ? Promise.resolve(mockFinancials()) : request<Financials>(`/financials?period=${encodeURIComponent(period)}`),
-  reconciliation: (period: string) => USE_MOCKS ? Promise.resolve(clone(reconciliationFixture)) : request<Reconciliation>(`/revenue/reconciliation?period=${encodeURIComponent(period)}`),
+  financials: (period: string) => USE_MOCKS ? Promise.resolve(mockFinancials()) : request<Financials | LegacyFinancials>(`/financials?period=${encodeURIComponent(period)}`).then(normalizeFinancials),
+  reconciliation: (period: string) => USE_MOCKS ? Promise.resolve(clone(reconciliationFixture)) : request<Parameters<typeof normalizeReconciliation>[0]>(`/revenue/reconciliation?period=${encodeURIComponent(period)}`).then(normalizeReconciliation),
   ask: (question: string) => USE_MOCKS ? Promise.resolve({ ...clone(askFixture), answer: `Demo response (sample context): ${askFixture.answer}` } as Answer) : request<Answer>('/ask', { question }),
   async decision(id: string, decision: 'approve' | 'reject', comment: string, role: Role) {
     if (!USE_MOCKS) { const result = await request<{ id: string; status: string }>(`/bills/${encodeURIComponent(id)}/decision`, { decision, comment }); changed(); return result; }
@@ -81,15 +82,16 @@ export const api = {
     }
     documents.unshift(doc); changed(); return clone(doc);
   },
-  async export(period: string) {
-    if (!USE_MOCKS) return request<{ downloadUrl: string }>('/export', { period });
+  async export(period: string): Promise<ExportResult> {
+    if (!USE_MOCKS) return request<ExportResult>('/export', { period });
     const { buildExport } = await import('./export');
-    return { downloadUrl: URL.createObjectURL(await buildExport(documents, bills, mockFinancials(), period)) };
+    const result = await buildExport(documents, bills, mockFinancials(), period);
+    return { downloadUrl: URL.createObjectURL(result.blob), ...result.summary };
   },
   async importTransactions(file: File) {
     if (USE_MOCKS) throw new Error('CSV import requires the live /transactions/import endpoint.');
     const { fetchAuthSession } = await import('aws-amplify/auth');
-    const token = (await fetchAuthSession()).tokens?.accessToken.toString();
+    const token = (await fetchAuthSession()).tokens?.idToken?.toString();
     if (!baseUrl || !token) throw new Error('Sign in and configure the API first.');
     const response = await fetch(`${baseUrl}/transactions/import`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'text/csv' }, body: file });
     if (!response.ok) throw new Error('CSV import failed.'); changed();
@@ -97,12 +99,20 @@ export const api = {
   }
 };
 function mockFinancials(): Financials {
-  const data = clone(financialsFixture);
+  const data: Financials = clone(financialsFixture);
   const newExpense = bills.filter(b => b.status === 'scheduled' && b.id !== 'b4').reduce((sum, b) => sum + b.amount, 0);
-  data.pnl.expenses += newExpense; data.pnl.netIncome -= newExpense;
-  data.pnl.monthly[5].expenses += newExpense;
-  data.kpis.margin = data.pnl.netIncome / data.pnl.revenue * 100;
-  data.balanceSheet.assets -= newExpense; data.balanceSheet.equity -= newExpense;
-  data.cashFlow.operating -= newExpense; data.cashFlow.net -= newExpense;
+  for (const bill of bills.filter(b => b.status === 'scheduled' && b.id !== 'b4')) {
+    const account = bill.glAccount.slice(0, 4);
+    let line = data.pnl.expenses.find(row => row.account === account);
+    if (!line) { line = { account, name: bill.glAccount.split('·')[1]?.trim() ?? bill.glAccount, amount: 0 }; data.pnl.expenses.push(line); }
+    line.amount += bill.amount;
+  }
+  data.pnl.totalExpenses += newExpense; data.pnl.operatingIncome -= newExpense;
+  data.kpis.margin = data.pnl.totalRevenue ? data.pnl.operatingIncome / data.pnl.totalRevenue : null;
+  data.kpis.expenseRatios = data.pnl.expenses.map(line => ({ account: line.account!, name: line.name, ratio: data.pnl.totalRevenue ? line.amount / data.pnl.totalRevenue : null }));
+  data.balanceSheet.totalAssets -= newExpense; data.balanceSheet.totalEquity -= newExpense;
+  data.balanceSheet.assets[0].amount -= newExpense; data.balanceSheet.equity[1].amount -= newExpense;
+  data.cashFlow.operating[1].amount -= newExpense;
+  data.cashFlow.netOperating -= newExpense; data.cashFlow.netChange -= newExpense; data.cashFlow.endingCash -= newExpense;
   return data;
 }

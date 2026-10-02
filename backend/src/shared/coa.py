@@ -1,7 +1,8 @@
-"""Chart of accounts for an independent advisor practice (task D1).
+"""Chart of accounts for an independent advisor practice (task D1, shared with C).
 
 Codes follow the usual small-business ranges:
 1xxx assets, 2xxx liabilities, 3xxx equity, 4xxx revenue, 6xxx expenses.
+Keep codes stable once data is seeded. Bill.glAccount must be an expense (6xxx) code.
 """
 
 from dataclasses import dataclass
@@ -46,9 +47,12 @@ CHART = [
 
 ACCOUNTS = {a.code: a for a in CHART}
 
-# Well-known codes the ledger posting code uses (C9).
+# Well-known codes the ledger posting and workflow code uses (C9).
 CASH = "1000"
 ACCOUNTS_PAYABLE = "2000"
+CREDIT_CARD_PAYABLE = "2100"
+DEFAULT_EXPENSE = "6900"
+REVENUE_ACCOUNTS = {"advisory": "4100", "commission": "4200", "trail": "4300", "other": "4900"}
 
 
 def get(code: str) -> Account:
@@ -56,3 +60,19 @@ def get(code: str) -> Account:
         return ACCOUNTS[code]
     except KeyError:
         raise ValueError(f"Unknown account code {code!r}") from None
+
+
+def is_valid(code) -> bool:
+    return str(code) in ACCOUNTS
+
+
+def is_expense(code) -> bool:
+    return is_valid(code) and ACCOUNTS[str(code)].type == "expense"
+
+
+def name(code) -> str:
+    return ACCOUNTS[str(code)].name if is_valid(code) else "Unknown"
+
+
+def kind(code) -> str:
+    return ACCOUNTS[str(code)].type if is_valid(code) else "unknown"

@@ -1,0 +1,183 @@
+{
+  "Comment": "Classify, extract, normalize, match and route uploaded financial documents.",
+  "StartAt": "Classify",
+  "States": {
+    "Classify": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${ClassifyFunctionArn}",
+        "Payload.$": "$"
+      },
+      "ResultSelector": {
+        "data.$": "$.Payload"
+      },
+      "ResultPath": "$.classification",
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.pipelineError",
+          "Next": "MarkFailed"
+        }
+      ],
+      "Next": "Extract"
+    },
+    "Extract": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${ExtractFunctionArn}",
+        "Payload.$": "$"
+      },
+      "ResultSelector": {
+        "data.$": "$.Payload"
+      },
+      "ResultPath": "$.extraction",
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.pipelineError",
+          "Next": "MarkFailed"
+        }
+      ],
+      "Next": "Normalize"
+    },
+    "Normalize": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${NormalizeFunctionArn}",
+        "Payload.$": "$"
+      },
+      "ResultSelector": {
+        "data.$": "$.Payload"
+      },
+      "ResultPath": "$.normalization",
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.pipelineError",
+          "Next": "MarkFailed"
+        }
+      ],
+      "Next": "MatchVendor"
+    },
+    "MatchVendor": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${MatchVendorFunctionArn}",
+        "Payload.$": "$"
+      },
+      "ResultSelector": {
+        "data.$": "$.Payload"
+      },
+      "ResultPath": "$.vendorMatch",
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.pipelineError",
+          "Next": "MarkFailed"
+        }
+      ],
+      "Next": "RouteDocument"
+    },
+    "RouteDocument": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.classification.data.documentType",
+          "StringEquals": "invoice",
+          "Next": "PrepareBill"
+        },
+        {
+          "Variable": "$.classification.data.documentType",
+          "StringEquals": "receipt",
+          "Next": "PrepareBill"
+        }
+      ],
+      "Default": "FinalizeDocument"
+    },
+    "PrepareBill": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${PrepareBillFunctionArn}",
+        "Payload.$": "$"
+      },
+      "ResultSelector": {
+        "data.$": "$.Payload"
+      },
+      "ResultPath": "$.preparedBill",
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.pipelineError",
+          "Next": "MarkFailed"
+        }
+      ],
+      "Next": "CreateBill"
+    },
+    "CreateBill": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${CreateBillFunctionArn}",
+        "Payload.$": "$.preparedBill.data"
+      },
+      "ResultSelector": {
+        "data.$": "$.Payload"
+      },
+      "ResultPath": "$.createdBill",
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.pipelineError",
+          "Next": "MarkFailed"
+        }
+      ],
+      "Next": "CompleteBill"
+    },
+    "CompleteBill": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${FinalizeFunctionArn}",
+        "Payload.$": "$"
+      },
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.pipelineError",
+          "Next": "MarkFailed"
+        }
+      ],
+      "End": true
+    },
+    "FinalizeDocument": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${FinalizeFunctionArn}",
+        "Payload.$": "$"
+      },
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.pipelineError",
+          "Next": "MarkFailed"
+        }
+      ],
+      "End": true
+    },
+    "MarkFailed": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${FailureFunctionArn}",
+        "Payload.$": "$"
+      },
+      "End": true
+    }
+  }
+}

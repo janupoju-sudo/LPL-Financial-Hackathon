@@ -16,7 +16,7 @@ export function zip(files: { name: string; data: Uint8Array }[]): Blob {
   const end = new Uint8Array(22); const ev = new DataView(end.buffer); ev.setUint32(0, 0x06054b50, true); ev.setUint16(8, files.length, true); ev.setUint16(10, files.length, true); ev.setUint32(12, directorySize, true); ev.setUint32(16, offset, true);
   return new Blob([...chunks, ...directory, end].map(bytes => bytes.slice().buffer as ArrayBuffer), { type: 'application/zip' });
 }
-export async function buildExport(documents: Document[], bills: Bill[], financials: Financials, period: string): Promise<Blob> {
+export async function buildExport(documents: Document[], bills: Bill[], financials: Financials, period: string): Promise<{ blob: Blob; summary: { documents: number; ledgerLines: number; missing: string[] } }> {
   const encode = (text: string) => new TextEncoder().encode(text);
   const csvCell = (value: string | number) => `"${String(value).replaceAll('"', '""')}"`;
   const ledger: (string | number)[][] = [['date', 'account', 'debit', 'credit', 'sourceDocId', 'memo']];
@@ -25,11 +25,17 @@ export async function buildExport(documents: Document[], bills: Bill[], financia
     ledger.push([base[0], bill.glAccount, bill.amount, 0, base[1], base[2]], [base[0], '2000 Accounts payable', 0, bill.amount, base[1], base[2]], [base[0], '2000 Accounts payable', bill.amount, 0, base[1], base[2]], [base[0], '1000 Cash', 0, bill.amount, base[1], base[2]]);
   }
   const files = [{ name: 'ledger.csv', data: encode(ledger.map(row => row.map(csvCell).join(',')).join('\r\n')) }, { name: 'financials.json', data: encode(JSON.stringify(financials, null, 2)) }, { name: 'README.txt', data: encode(`SAMPLE - FICTIONAL DATA\nPeriod: ${period}\nDemo export. Ledger contains scheduled demo bills only; financials include seeded history. Uploaded files have simulated extraction. Documents include the full demo library.`) }];
+  let included = 0;
+  const missing: string[] = [];
   for (const doc of documents) {
-    if (!doc.viewUrl) continue;
-    const response = await fetch(doc.viewUrl);
-    if (!response.ok) throw new Error(`Could not export ${doc.filename}.`);
-    files.push({ name: `documents/${doc.id}-${doc.filename.replace(/[^a-zA-Z0-9._-]/g, '_')}`, data: new Uint8Array(await response.arrayBuffer()) });
+    try {
+      if (!doc.viewUrl) throw new Error('Missing document URL');
+      const response = await fetch(doc.viewUrl);
+      if (!response.ok) throw new Error('Document unavailable');
+      files.push({ name: `documents/${doc.id}-${doc.filename.replace(/[^a-zA-Z0-9._-]/g, '_')}`, data: new Uint8Array(await response.arrayBuffer()) });
+      included++;
+    } catch { missing.push(doc.filename); }
   }
-  return zip(files);
+  if (missing.length) files[2].data = encode(new TextDecoder().decode(files[2].data) + `\nCould not include: ${missing.join(', ')}`);
+  return { blob: zip(files), summary: { documents: included, ledgerLines: ledger.length - 1, missing } };
 }

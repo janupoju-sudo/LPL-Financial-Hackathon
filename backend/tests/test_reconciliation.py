@@ -1,7 +1,7 @@
 import unittest
 
-from functions.financials import reconciliation as rec
-from tests.fixtures import FEE_SCHEDULE, PAYOUT_SEP
+from financials import reconciliation as rec
+from fixtures import FEE_SCHEDULE, PAYOUT_SEP
 
 
 class Reconciliation(unittest.TestCase):
@@ -41,6 +41,9 @@ class Reconciliation(unittest.TestCase):
         r = rec.response(FEE_SCHEDULE, PAYOUT_SEP, "2026-09")
         self.assertEqual(r["variance"], -412.0)
         self.assertEqual(r["lines"][3]["actual"], 2478.0)
+        flag = r["flags"][0]  # frontend reads id, reason, docId
+        self.assertEqual((flag["id"], flag["docId"]), ("flag-va-4471", "d3"))
+        self.assertTrue(flag["reason"].startswith("Variable annuity trail, contract …4471 is $412.00 short."))
 
 
 if __name__ == "__main__":

@@ -1,1 +1,159 @@
-{"pnl":{"revenue":367588,"expenses":225200,"netIncome":142388,"monthly":[{"month":"Apr","revenue":112400,"expenses":65300},{"month":"May","revenue":118200,"expenses":68200},{"month":"Jun","revenue":120500,"expenses":70100},{"month":"Jul","revenue":120000,"expenses":72100},{"month":"Aug","revenue":124000,"expenses":74500},{"month":"Sep","revenue":123588,"expenses":78600}],"categories":[{"name":"Staff & payroll","amount":142000},{"name":"Office & rent","amount":31500},{"name":"Technology","amount":24700},{"name":"Marketing & compliance","amount":27000}]},"balanceSheet":{"assets":482000,"liabilities":38600,"equity":443400},"cashFlow":{"operating":142388,"investing":-12000,"financing":-45000,"net":85388},"kpis":{"margin":38.7,"recurringPct":86,"revPerClient":2042.16},"valuation":{"low":3100000,"mid":3700000,"high":4300000,"method":"Estimated recurring revenue TTM ($1.23M) × 2.5–3.5, adjusted for recurring revenue, operating margin and client concentration. Illustrative estimate, not an appraisal."}}
+{
+  "period": "2026-Q3",
+  "pnl": {
+    "period": "2026-Q3",
+    "revenue": [
+      {
+        "account": "4100",
+        "name": "Advisory fees",
+        "amount": 294000
+      },
+      {
+        "account": "4200",
+        "name": "Commissions",
+        "amount": 54000
+      },
+      {
+        "account": "4300",
+        "name": "Trails",
+        "amount": 19588
+      }
+    ],
+    "totalRevenue": 367588,
+    "expenses": [
+      {
+        "account": "6100",
+        "name": "Staff & payroll",
+        "amount": 142000
+      },
+      {
+        "account": "6200",
+        "name": "Office & rent",
+        "amount": 31500
+      },
+      {
+        "account": "6300",
+        "name": "Technology",
+        "amount": 24700
+      },
+      {
+        "account": "6500",
+        "name": "Marketing",
+        "amount": 18000
+      },
+      {
+        "account": "6600",
+        "name": "Compliance",
+        "amount": 9000
+      }
+    ],
+    "totalExpenses": 225200,
+    "operatingIncome": 142388
+  },
+  "balanceSheet": {
+    "asOf": "2026-09-30",
+    "assets": [
+      {
+        "account": "1000",
+        "name": "Cash",
+        "amount": 482000
+      }
+    ],
+    "totalAssets": 482000,
+    "liabilities": [
+      {
+        "account": "2000",
+        "name": "Accounts payable",
+        "amount": 38600
+      }
+    ],
+    "totalLiabilities": 38600,
+    "equity": [
+      {
+        "account": "3000",
+        "name": "Owner capital",
+        "amount": 301012
+      },
+      {
+        "account": null,
+        "name": "Earnings to date",
+        "amount": 142388
+      }
+    ],
+    "totalEquity": 443400
+  },
+  "cashFlow": {
+    "period": "2026-Q3",
+    "beginningCash": 384612,
+    "operating": [
+      {
+        "label": "Collections from payouts and clients",
+        "amount": 367588
+      },
+      {
+        "label": "Payments to vendors and staff",
+        "amount": -225200
+      }
+    ],
+    "netOperating": 142388,
+    "financing": [
+      {
+        "label": "Owner distributions",
+        "amount": -45000
+      }
+    ],
+    "netFinancing": -45000,
+    "netChange": 97388,
+    "endingCash": 482000
+  },
+  "kpis": {
+    "margin": 0.3874,
+    "recurringPct": 0.8531,
+    "revPerClient": 2042.16,
+    "expenseRatios": [
+      {
+        "account": "6100",
+        "name": "Staff & payroll",
+        "ratio": 0.3863
+      },
+      {
+        "account": "6200",
+        "name": "Office & rent",
+        "ratio": 0.0857
+      },
+      {
+        "account": "6300",
+        "name": "Technology",
+        "ratio": 0.0672
+      },
+      {
+        "account": "6500",
+        "name": "Marketing",
+        "ratio": 0.049
+      },
+      {
+        "account": "6600",
+        "name": "Compliance",
+        "ratio": 0.0245
+      }
+    ],
+    "previous": {
+      "period": "2026-Q2",
+      "totalRevenue": 351100,
+      "margin": 0.4207,
+      "recurringPct": 0.8488
+    }
+  },
+  "valuation": {
+    "low": 3075000,
+    "mid": 3690000,
+    "high": 4305000,
+    "method": "Estimated recurring revenue TTM ($1.23M) × 2.5–3.5, adjusted for recurring revenue, operating margin and client concentration. Illustrative estimate, not an appraisal.",
+    "recurringRevenueTtm": 1230000,
+    "multiples": {
+      "low": 2.5,
+      "mid": 3,
+      "high": 3.5
+    }
+  }
+}
