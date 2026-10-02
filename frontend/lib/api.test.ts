@@ -11,6 +11,7 @@ import financialsFixture from '../mocks/financials.json';
 import reconciliationFixture from '../mocks/reconciliation.json';
 import type { Financials, Reconciliation } from './types';
 import { normalizeFinancials, normalizeReconciliation, type LegacyFinancials } from './contracts';
+import { validateLocalApi } from './local-mode';
 
 test('approval enforces role, unblocks on vendor documents, and updates balanced financials', async () => {
   const before = await api.financials('2026-Q3');
@@ -67,6 +68,13 @@ test('current-main reconciliation reason becomes the canonical flag message', ()
   const data: Reconciliation = { ...reconciliationFixture, lines: [], flags: [] };
   const response = normalizeReconciliation({ ...data, flags: [{ lineId: 'rev3', status: 'short', severity: 'high', reason: 'Trail is $412 short.' }] });
   assert.equal(response.flags[0].message, 'Trail is $412 short.');
+});
+test('authentication bypass is limited to explicit loopback APIs', () => {
+  assert.equal(validateLocalApi('http://localhost:8787/'), 'http://localhost:8787');
+  assert.equal(validateLocalApi('http://127.0.0.1:8787'), 'http://127.0.0.1:8787');
+  assert.throws(() => validateLocalApi('https://api.example.com'), /loopback/);
+  assert.throws(() => validateLocalApi('http://localhost.evil.example'), /loopback/);
+  assert.throws(() => validateLocalApi(undefined), /Set NEXT_PUBLIC_API_URL/);
 });
 test('reconciliation uses line status and handles a missing payout with no source document', () => {
   const data: Reconciliation = { ...reconciliationFixture, lines: [{ id: 'missing-1', label: 'Unpaid advisory fee', source: 'advisory', ref: null, expected: 100, actual: 0, variance: -100, status: 'missing', docId: null }], flags: [{ lineId: 'missing-1', status: 'missing', severity: 'high', message: 'Unpaid advisory fee is missing.' }] };
