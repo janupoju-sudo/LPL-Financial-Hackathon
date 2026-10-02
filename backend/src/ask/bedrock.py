@@ -2,7 +2,7 @@
 
 Env vars:
   AWS_REGION           set by Lambda
-  ASK_MODEL_ID         defaults to anthropic.claude-opus-5-5
+  ASK_MODEL_ID         required; set to an approved, enabled Bedrock model ID
   GUARDRAIL_ID         from D8; if unset, the guardrail step is skipped (local testing)
   GUARDRAIL_VERSION    defaults to DRAFT
 """
@@ -14,10 +14,17 @@ import boto3
 
 from .answer import Refused
 
-MODEL_ID = os.environ.get("ASK_MODEL_ID", "anthropic.claude-opus-5-5")
-
 _claude = None
 _runtime = None
+
+
+def model_id() -> str:
+    value = os.environ.get("ASK_MODEL_ID", "").strip()
+    if not value:
+        raise RuntimeError(
+            "ASK_MODEL_ID must be set to a model approved and enabled for this account"
+        )
+    return value
 
 
 def claude_json(system: str, user: str, schema: dict) -> dict:
@@ -27,7 +34,7 @@ def claude_json(system: str, user: str, schema: dict) -> dict:
         from anthropic import AnthropicBedrockMantle
         _claude = AnthropicBedrockMantle(aws_region=os.environ["AWS_REGION"])
     resp = _claude.messages.create(
-        model=MODEL_ID,
+        model=model_id(),
         max_tokens=16000,
         system=system,
         messages=[{"role": "user", "content": user}],

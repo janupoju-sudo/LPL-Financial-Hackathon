@@ -15,6 +15,15 @@ from ingest.route import handler as route_handler, prepare_bill
 
 
 class IngestValidationTests(unittest.TestCase):
+    def test_ask_model_id_must_be_configured(self) -> None:
+        from ask.bedrock import model_id
+
+        with patch.dict("os.environ", {}, clear=True):
+            with self.assertRaisesRegex(RuntimeError, "ASK_MODEL_ID must be set"):
+                model_id()
+        with patch.dict("os.environ", {"ASK_MODEL_ID": "approved.model-id"}):
+            self.assertEqual(model_id(), "approved.model-id")
+
     def test_parses_practice_and_document_from_upload_key(self) -> None:
         self.assertEqual(
             upload_context(
@@ -129,7 +138,7 @@ class IngestValidationTests(unittest.TestCase):
                 }
             },
         }
-        payload = prepare_bill(event)
+        payload = prepare_bill(event, Mock())
         self.assertEqual(payload["vendorId"], "ven-1")
         self.assertEqual(payload["vendorName"], "Orion Software LLC")
         self.assertEqual(payload["amount"], 1850.0)

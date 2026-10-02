@@ -46,7 +46,7 @@ Dependencies are noted as `← B3` (wait on, or mock, that task).
 - [HM] B4. `normalize` Lambda: Bedrock maps Textract output → our JSON schema (strict JSON, validated) + confidence
 - [HM] B5. `match_vendor` Lambda: exact/alias → fuzzy match (e.g. `rapidfuzz`); set `defaultGlAccount` from history; create the vendor if new ← C3
 - [HM] B6. Step Functions `IngestDocument` ASL: classify → branch → normalize → match → create Bill / RevenueLines → start `ApproveBill` ← C4
-- [ ] B7. EventBridge rule: S3 `Object Created` in `uploads/` → start `IngestDocument` ← E3
+- [HM] B7. EventBridge rule: S3 `Object Created` in `uploads/` → start `IngestDocument` ← E3 (SAM wiring added; awaiting merge/deploy)
 - [ ] B8. Test on **all seed docs** (E5); tune prompts until every demo doc extracts correctly
 - [HM] B9. Void check / W-9 → update vendor `hasVoidCheck`, `hasW9`, `bankLast4`
 
