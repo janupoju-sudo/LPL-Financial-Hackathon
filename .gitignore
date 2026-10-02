@@ -10,3 +10,4 @@ samconfig.toml
 .env.*
 node_modules/
 .next/
+backend/.dev-exports/
