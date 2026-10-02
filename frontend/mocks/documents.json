@@ -1,0 +1,78 @@
+[
+  {
+    "id": "d1",
+    "type": "invoice",
+    "filename": "advent-september-invoice.pdf",
+    "status": "processed",
+    "vendorName": "Advent Software",
+    "amount": 2450,
+    "createdAt": "2026-09-24",
+    "confidence": 0.98,
+    "extracted": {
+      "vendor": "Advent Software",
+      "invoiceNumber": "ADV-0926",
+      "amount": 2450,
+      "dueDate": "2026-10-15",
+      "glAccount": "6300 · Technology",
+      "description": "Portfolio management platform"
+    },
+    "viewUrl": "/sample-d1.pdf",
+    "billId": "b1"
+  },
+  {
+    "id": "d2",
+    "type": "invoice",
+    "filename": "northstar-brand-studio.pdf",
+    "status": "processed",
+    "vendorName": "Northstar Studio",
+    "amount": 1850,
+    "createdAt": "2026-09-25",
+    "confidence": 0.94,
+    "extracted": {
+      "vendor": "Northstar Studio",
+      "invoiceNumber": "NS-104",
+      "amount": 1850,
+      "dueDate": "2026-10-10",
+      "glAccount": "6500 · Marketing"
+    },
+    "viewUrl": "/sample-d2.pdf",
+    "billId": "b2"
+  },
+  {
+    "id": "d3",
+    "type": "receipt",
+    "filename": "team-lunch-receipt.pdf",
+    "status": "processed",
+    "vendorName": "Coastal Kitchen",
+    "amount": 186.5,
+    "createdAt": "2026-09-26",
+    "confidence": 0.72,
+    "extracted": {
+      "vendor": "Coastal Kitchen",
+      "amount": 186.5,
+      "date": "2026-09-26",
+      "glAccount": "6700 · Meals & travel"
+    },
+    "viewUrl": "/sample-d3.pdf",
+    "billId": "b3"
+  },
+  {
+    "id": "d4",
+    "type": "payout_statement",
+    "filename": "lpl-september-payout.pdf",
+    "status": "processed",
+    "vendorName": "LPL Financial",
+    "amount": 123588,
+    "createdAt": "2026-09-30",
+    "confidence": 0.99,
+    "extracted": {
+      "source": "LPL Financial",
+      "period": "2026-09",
+      "advisory": 98000,
+      "commission": 18000,
+      "trail": 7588,
+      "total": 123588
+    },
+    "viewUrl": "/sample-d4.pdf"
+  }
+]
