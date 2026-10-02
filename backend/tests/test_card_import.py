@@ -94,3 +94,15 @@ def test_rejects_bad_csv_and_wrong_role(aws):
     assert _import("Date,Description,Amount\n2026-09-01,X,abc\n")[0] == 400
     assert _import("")[0] == 400
     assert _import(CSV, groups=("partner",))[0] == 403
+
+
+def test_list_transactions_reads_imported_charges(aws):
+    _import(CSV)
+    resp = transactions.handler(api_event("GET /transactions", groups=("owner",)))
+    assert resp["statusCode"] == 200
+    txns = json.loads(resp["body"])
+    assert [t["description"] for t in txns][:1] == ["CORNER DELI"]  # newest first
+    assert len(txns) == 4  # the payment row is skipped on import
+    zoom = next(t for t in txns if t["description"].startswith("ZOOM"))
+    assert (zoom["amount"], zoom["glAccount"], zoom["glAccountName"]) == (149.9, "6300", "Technology")
+    assert zoom["journalId"].startswith("j-card-")

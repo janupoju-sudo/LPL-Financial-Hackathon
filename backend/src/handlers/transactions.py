@@ -1,6 +1,7 @@
 """Card transactions API (C11).
 
 POST /transactions/import   raw CSV body (Content-Type: text/csv)            (owner, ops, lpl_bookkeeper)
+GET  /transactions          imported card charges, newest first (read from the j-card-* journals)
 
 CSV: a header row with a date column (Date | Transaction Date | Posted Date), a description column
 (Description | Merchant | Payee) and an amount column (Amount | Debit). Optional: Transaction ID, Card.
@@ -21,7 +22,7 @@ import io
 import re
 from datetime import date, datetime
 
-from shared import coa, ledger, repo
+from shared import coa, ddb, ledger, repo
 from shared.auth import get_caller, require_role
 from shared.ddb import get_item
 from shared.http import HttpError, router
@@ -199,6 +200,30 @@ def import_transactions(event):
     return 200, result
 
 
+def list_transactions(event):
+    """Card charges are stored only as their j-card-<txnId> journals, so read them back
+    from the ledger: the debit line carries the expense account, memo and receipt link."""
+    caller = get_caller(event)
+    lines = ddb.get_ledger_entries(caller.practice_id, "0000-01-01", date.today().isoformat())
+    txns = []
+    for line in lines:
+        if line.get("sourceType") != "card" or not line.get("debit"):
+            continue
+        memo = line.get("memo") or ""
+        txns.append({
+            "txnId": line.get("sourceId"),
+            "date": line["date"],
+            "description": memo[len("Card: "):] if memo.startswith("Card: ") else memo,
+            "amount": line["debit"] / 100,
+            "glAccount": line["account"],
+            "glAccountName": coa.name(line["account"]),
+            "receiptDocumentId": line.get("sourceDocId"),
+            "journalId": line.get("journalId"),
+        })
+    return 200, sorted(txns, key=lambda t: (t["date"], t["txnId"] or ""), reverse=True)
+
+
 handler = router({
     "POST /transactions/import": import_transactions,
+    "GET /transactions": list_transactions,
 })
