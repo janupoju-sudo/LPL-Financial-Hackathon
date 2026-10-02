@@ -201,6 +201,126 @@ Resources:
         CreateRule: { Type: HttpApi, Properties: { ApiId: !Ref HttpApi, Path: /rules, Method: POST } }
         UpdateRule: { Type: HttpApi, Properties: { ApiId: !Ref HttpApi, Path: "/rules/{id}", Method: PATCH } }
 
+  # ---------------------------------------------------------------- D: financials
+  # GET /financials (D2/D3/D7) and GET /revenue/reconciliation (D4)
+  FinancialsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: financials.handler.handler
+      MemorySize: 512
+      Policies:
+        - DynamoDBReadPolicy: { TableName: !Ref LedgerTable }
+      Events:
+        GetFinancials: { Type: HttpApi, Properties: { ApiId: !Ref HttpApi, Path: /financials, Method: GET } }
+        GetReconciliation: { Type: HttpApi, Properties: { ApiId: !Ref HttpApi, Path: /revenue/reconciliation, Method: GET } }
+
+  # POST /ask (D5)
+  AskFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: ask.handler.handler
+      Timeout: 29          # HTTP APIs cut off at 30s
+      MemorySize: 512
+      Environment:
+        Variables:
+          ASK_MODEL_ID: anthropic.claude-opus-5-5
+          GUARDRAIL_ID: !GetAtt AskGuardrail.GuardrailId
+          GUARDRAIL_VERSION: !GetAtt AskGuardrailVersion.Version
+      Policies:
+        - DynamoDBReadPolicy: { TableName: !Ref LedgerTable }
+        - Statement:
+            - Effect: Allow
+              Action: [bedrock:InvokeModel, bedrock:InvokeModelWithResponseStream]
+              Resource: "*"
+            - Effect: Allow
+              Action: bedrock:ApplyGuardrail
+              Resource: !GetAtt AskGuardrail.GuardrailArn
+      Events:
+        Ask: { Type: HttpApi, Properties: { ApiId: !Ref HttpApi, Path: /ask, Method: POST } }
+
+  # POST /export (D6)
+  ExportFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: export.handler.handler
+      Timeout: 29
+      MemorySize: 1024
+      Environment:
+        Variables:
+          EXPORTS_BUCKET: !Ref ExportsBucket
+      Policies:
+        - DynamoDBReadPolicy: { TableName: !Ref LedgerTable }
+        - S3ReadPolicy: { BucketName: !Ref DocsBucket }
+        - S3CrudPolicy: { BucketName: !Ref ExportsBucket }
+      Events:
+        Export: { Type: HttpApi, Properties: { ApiId: !Ref HttpApi, Path: /export, Method: POST } }
+
+  # Export ZIPs are temporary; the documents themselves stay in DocsBucket.
+  ExportsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault: { SSEAlgorithm: AES256 }
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: ExpireExports
+            Status: Enabled
+            ExpirationInDays: 1
+
+  # ---------------------------------------------------------------- D8: guardrail for Ask
+  AskGuardrail:
+    Type: AWS::Bedrock::Guardrail
+    Properties:
+      Name: !Sub ledgerline-ask-${Stage}
+      Description: Keeps Ask your books on the practice's own finances and masks personal information.
+      BlockedInputMessaging: >-
+        I can only answer questions about your practice's own books, like revenue,
+        expenses, payouts and bills. I can't give investment advice.
+      BlockedOutputsMessaging: >-
+        I can't share that answer. Try asking about a specific period, account or vendor.
+      TopicPolicyConfig:
+        TopicsConfig:
+          - Name: InvestmentAdvice
+            Type: DENY
+            Definition: >-
+              Recommendations or opinions about buying, selling or holding securities, funds,
+              annuities or other investments, or about how a client should allocate or manage
+              their portfolio.
+            Examples:
+              - Which stocks should my clients buy right now?
+              - Should I move my clients out of bond funds?
+              - Is this annuity a good investment for a retiree?
+              - What's the best ETF to recommend this quarter?
+      ContentPolicyConfig:
+        FiltersConfig:
+          - { Type: PROMPT_ATTACK, InputStrength: HIGH, OutputStrength: NONE }
+          - { Type: MISCONDUCT, InputStrength: MEDIUM, OutputStrength: MEDIUM }
+          - { Type: HATE, InputStrength: MEDIUM, OutputStrength: MEDIUM }
+          - { Type: INSULTS, InputStrength: MEDIUM, OutputStrength: MEDIUM }
+      SensitiveInformationPolicyConfig:
+        # Person names are left alone on purpose: answers need vendor and staff names.
+        PiiEntitiesConfig:
+          - { Type: US_SOCIAL_SECURITY_NUMBER, Action: ANONYMIZE }
+          - { Type: US_BANK_ACCOUNT_NUMBER, Action: ANONYMIZE }
+          - { Type: US_BANK_ROUTING_NUMBER, Action: ANONYMIZE }
+          - { Type: CREDIT_DEBIT_CARD_NUMBER, Action: ANONYMIZE }
+          - { Type: US_INDIVIDUAL_TAX_IDENTIFICATION_NUMBER, Action: ANONYMIZE }
+          - { Type: EMAIL, Action: ANONYMIZE }
+          - { Type: PHONE, Action: ANONYMIZE }
+          - { Type: ADDRESS, Action: ANONYMIZE }
+
+  AskGuardrailVersion:
+    Type: AWS::Bedrock::GuardrailVersion
+    Properties:
+      GuardrailIdentifier: !GetAtt AskGuardrail.GuardrailId
+      Description: Demo version
+
   # ---------------------------------------------------------------- workflow
   CreateBillFunction:
     Type: AWS::Serverless::Function
@@ -328,6 +448,13 @@ Outputs:
     Value: !Ref AppEventBus
   ApproveBillStateMachineArn:
     Value: !Ref ApproveBillStateMachine
+  AskGuardrailId:
+    Description: For scripts/check_guardrail.py
+    Value: !GetAtt AskGuardrail.GuardrailId
+  AskGuardrailVersion:
+    Value: !GetAtt AskGuardrailVersion.Version
+  ExportsBucketName:
+    Value: !Ref ExportsBucket
   CreateBillFunctionArn:
     Description: Invoke from the IngestDocument state machine (role B)
     Value: !GetAtt CreateBillFunction.Arn

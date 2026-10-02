@@ -9,6 +9,9 @@ brew install aws-sam-cli awscli        # once
 aws configure                          # region us-east-1
 cd backend
 sam build && sam deploy --guided       # first time; stack name ledgerline-dev; accept defaults
+# sam build needs Python 3.12 on your Mac (brew install python@3.12) because src/requirements.txt
+# installs the anthropic SDK; or use `sam build --use-container` with Docker running.
+# Before testing /ask: Bedrock console -> Model access -> enable the model in ASK_MODEL_ID.
 python scripts/seed.py --table ledgerline-dev
 python scripts/demo_users.py --user-pool-id <UserPoolId> --client-id <UserPoolClientId>
 ```
