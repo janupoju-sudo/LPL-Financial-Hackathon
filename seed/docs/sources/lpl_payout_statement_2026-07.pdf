@@ -38,7 +38,7 @@ endobj
 7 0 obj
 <<
 /Author (anonymous) /CreationDate (D:20261002175519-04'00') /Creator (anonymous) /Keywords () /ModDate (D:20261002175519-04'00') /Producer (ReportLab PDF Library - \(opensource\)) 
-  /Subject (unspecified) /Title (LPL Payout Statement September 2026) /Trapped /False
+  /Subject (unspecified) /Title (Fictional LPL Payout Statement 2026-07) /Trapped /False
 >>
 endobj
 8 0 obj
@@ -48,7 +48,7 @@ endobj
 endobj
 9 0 obj
 <<
-/Length 1942
+/Length 1788
 >>
 stream
 1 0 0 1 0 0 cm  BT /F1 12 Tf 14.4 TL ET
@@ -60,46 +60,42 @@ BT 1 0 0 1 -253.998 0 Tm (SAMPLE \227 FICTIONAL DATA) Tj T* ET
 Q
 .058824 .090196 .164706 rg
 BT /F2 20 Tf 24 TL ET
-BT 1 0 0 1 54 748.8 Tm (LPL Financial) Tj T* ET
+BT 1 0 0 1 54 738 Tm (LPL Financial) Tj T* ET
 BT /F1 11 Tf 13.2 TL ET
-BT 1 0 0 1 54 720 Tm (Payout statement \177 September 2026) Tj T* ET
+BT 1 0 0 1 54 709.2 Tm (Payout statement - 2026-07) Tj T* ET
 BT /F2 12 Tf 14.4 TL ET
-BT 1 0 0 1 54 630 Tm (Revenue summary) Tj T* ET
+BT 1 0 0 1 54 662.4 Tm (Received payments) Tj T* ET
 .886275 .909804 .941176 rg
-n 50.4 558 511.2 23.04 re B*
+n 50.4 608.4 511.2 23.04 re B*
 .058824 .090196 .164706 rg
 BT /F2 9 Tf 10.8 TL ET
-BT 1 0 0 1 64.8 566.64 Tm (Description) Tj T* ET
-BT 1 0 0 1 216 566.64 Tm (Source) Tj T* ET
-BT 1 0 0 1 345.6 566.64 Tm (Reference) Tj T* ET
-BT 1 0 0 1 468 566.64 Tm (Amount) Tj T* ET
+BT 1 0 0 1 64.8 617.04 Tm (Description) Tj T* ET
+BT 1 0 0 1 216 617.04 Tm (Source) Tj T* ET
+BT 1 0 0 1 345.6 617.04 Tm (Reference) Tj T* ET
+BT 1 0 0 1 468 617.04 Tm (Amount) Tj T* ET
 BT /F1 9 Tf 10.8 TL ET
-n 50.4 519.12 511.2 23.04 re S
-BT 1 0 0 1 64.8 533.52 Tm (Advisory fees) Tj T* ET
-BT 1 0 0 1 216 533.52 Tm (advisory) Tj T* ET
-BT 1 0 0 1 345.6 533.52 Tm  T* ET
-BT 1 0 0 1 461.16 533.52 Tm ($182,400.00) Tj T* ET
-n 50.4 488.88 511.2 23.04 re S
-BT 1 0 0 1 64.8 503.28 Tm (Mutual fund commissions) Tj T* ET
-BT 1 0 0 1 216 503.28 Tm (commission) Tj T* ET
-BT 1 0 0 1 345.6 503.28 Tm  T* ET
-BT 1 0 0 1 466.164 503.28 Tm ($14,200.00) Tj T* ET
-n 50.4 458.64 511.2 23.04 re S
-BT 1 0 0 1 64.8 473.04 Tm (Monthly 12b-1 trails) Tj T* ET
-BT 1 0 0 1 216 473.04 Tm (trail) Tj T* ET
-BT 1 0 0 1 345.6 473.04 Tm (12b1) Tj T* ET
-BT 1 0 0 1 471.168 473.04 Tm ($6,150.00) Tj T* ET
-n 50.4 428.4 511.2 23.04 re S
-BT 1 0 0 1 64.8 442.8 Tm (Variable annuity trail, contract 4471) Tj T* ET
-BT 1 0 0 1 216 442.8 Tm (trail) Tj T* ET
-BT 1 0 0 1 345.6 442.8 Tm (4471) Tj T* ET
-BT 1 0 0 1 471.168 442.8 Tm ($2,478.00) Tj T* ET
+n 50.4 569.52 511.2 23.04 re S
+BT 1 0 0 1 64.8 583.92 Tm (Advisory fees) Tj T* ET
+BT 1 0 0 1 216 583.92 Tm (advisory) Tj T* ET
+BT 1 0 0 1 345.6 583.92 Tm  T* ET
+BT 1 0 0 1 461.16 583.92 Tm ($182,400.00) Tj T* ET
+n 50.4 539.28 511.2 23.04 re S
+BT 1 0 0 1 64.8 553.68 Tm (Mutual fund commissions) Tj T* ET
+BT 1 0 0 1 216 553.68 Tm (commission) Tj T* ET
+BT 1 0 0 1 345.6 553.68 Tm  T* ET
+BT 1 0 0 1 466.164 553.68 Tm ($14,200.00) Tj T* ET
+n 50.4 509.04 511.2 23.04 re S
+BT 1 0 0 1 64.8 523.44 Tm (Monthly 12b-1 trails) Tj T* ET
+BT 1 0 0 1 216 523.44 Tm (trail) Tj T* ET
+BT 1 0 0 1 345.6 523.44 Tm (12b1) Tj T* ET
+BT 1 0 0 1 471.168 523.44 Tm ($6,150.00) Tj T* ET
 BT /F2 11 Tf 13.2 TL ET
-BT 1 0 0 1 64.8 244.8 Tm (Total paid) Tj T* ET
-BT 1 0 0 1 464.44 244.8 Tm ($205,228.00) Tj T* ET
+BT 1 0 0 1 64.8 392.4 Tm (Total paid) Tj T* ET
+BT 1 0 0 1 464.44 392.4 Tm ($202,750.00) Tj T* ET
+BT 1 0 0 1 54 93.6 Tm (Fictional historical sample; cloud upload is pending.) Tj T* ET
 BT /F3 9 Tf 10.8 TL ET
 .278431 .333333 .411765 rg
-BT 1 0 0 1 291.528 36 Tm (lpl_payout_statement_sep_2026.pdf \177 SAMPLE \227 FICTIONAL DATA) Tj T* ET
+BT 1 0 0 1 298.035 36 Tm (lpl_payout_statement_2026-07.pdf \177 SAMPLE \227 FICTIONAL DATA) Tj T* ET
  
 endstream
 endobj
@@ -113,12 +109,12 @@ xref
 0000000446 00000 n 
 0000000639 00000 n 
 0000000707 00000 n 
-0000000995 00000 n 
-0000001054 00000 n 
+0000000998 00000 n 
+0000001057 00000 n 
 trailer
 <<
 /ID 
-[<6d7185ab3474636bcaa1d992a343c077><6d7185ab3474636bcaa1d992a343c077>]
+[<fcf385be48b9356f44cb498b20b9a13a><fcf385be48b9356f44cb498b20b9a13a>]
 % ReportLab generated PDF document -- digest (opensource)
 
 /Info 7 0 R
@@ -126,5 +122,5 @@ trailer
 /Size 10
 >>
 startxref
-3047
+2896
 %%EOF

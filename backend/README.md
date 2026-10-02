@@ -14,7 +14,11 @@ sam build && sam deploy --guided       # first time; stack name ledgerline-dev
 # When prompted for BedrockModelId, enter the exact model ID enabled for this account.
 # Do not accept a default: the parameter is required for Ask and document classification.
 python scripts/seed.py --table ledgerline-dev
-python scripts/seed_ddb.py --table ledgerline-dev  # 12 months of history; leaves Sep 2026 for the live demo
+python scripts/seed_ddb.py --table ledgerline-dev  # history through Aug 2026
+# Before a live September demo, add normal September expenses only:
+python scripts/seed_ddb.py --table ledgerline-dev --live-sept
+# Only if the live payout upload failed and no September payout exists:
+python scripts/seed_ddb.py --table ledgerline-dev --include-sept
 python scripts/demo_users.py --user-pool-id <UserPoolId> --client-id <UserPoolClientId>
 ```
 Stack outputs give you `ApiUrl`, `UserPoolId`, `UserPoolClientId`, `DocsBucketName`,
@@ -86,6 +90,23 @@ Controls: no self-approval (uploader ≠ approver), one decision per task token 
 | POST | `/export` | `{period}` | `{downloadUrl, documents, ledgerLines, missing}`; `downloadUrl` valid 15 min (D) |
 
 Money in the API is **dollars**. Money in the ledger is **integer cents**.
+
+## Role E demo seed modes
+
+Run checks locally with `python scripts/seed_ddb.py --check --live-sept` or
+`python scripts/seed_ddb.py --check --include-sept`; `--check` never calls AWS.
+The live seed includes September's baseline operating expenses and payment
+journals, but does not create September payout journals or `REV#2026-09#` rows.
+That leaves the payout available for ingestion and reconciliation.
+
+`--include-sept` is a separate fallback for a failed live upload. It adds the same
+September baseline expenses plus the fictional $2,478 contract 4471 payment and
+four revenue lines. Before writing fallback data, the script checks for existing
+September `REV#` rows and payout journals; if either exists, it skips the fallback
+payout. Never use fallback mode as the live-seed mode. The two flags are mutually
+exclusive. Rent and compliance journals for July onward cite the lease amendment
+and month-specific consultant invoice; legacy July/August aggregate expense rows
+are detected and rejected rather than duplicated.
 
 ---
 

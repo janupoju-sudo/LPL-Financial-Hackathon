@@ -1,6 +1,180 @@
 {
   "generated_by": "seed/generate_docs.py",
   "watermark": "SAMPLE \u2014 FICTIONAL DATA",
+  "source_documents": [
+    {
+      "document_id": "doc_lpl_payout_2025_09",
+      "filename": "lpl_payout_statement_2025-09.pdf",
+      "local_path": "sources/lpl_payout_statement_2025-09.pdf",
+      "document_type": "payout_statement",
+      "period": "2025-09",
+      "amount_dollars": 205640,
+      "s3_key_template": "uploads/{practiceId}/doc_lpl_payout_2025_09/lpl_payout_statement_2025-09.pdf",
+      "upload_status": "pending"
+    },
+    {
+      "document_id": "doc_lpl_payout_2025_10",
+      "filename": "lpl_payout_statement_2025-10.pdf",
+      "local_path": "sources/lpl_payout_statement_2025-10.pdf",
+      "document_type": "payout_statement",
+      "period": "2025-10",
+      "amount_dollars": 202750,
+      "s3_key_template": "uploads/{practiceId}/doc_lpl_payout_2025_10/lpl_payout_statement_2025-10.pdf",
+      "upload_status": "pending"
+    },
+    {
+      "document_id": "doc_lpl_payout_2025_11",
+      "filename": "lpl_payout_statement_2025-11.pdf",
+      "local_path": "sources/lpl_payout_statement_2025-11.pdf",
+      "document_type": "payout_statement",
+      "period": "2025-11",
+      "amount_dollars": 202750,
+      "s3_key_template": "uploads/{practiceId}/doc_lpl_payout_2025_11/lpl_payout_statement_2025-11.pdf",
+      "upload_status": "pending"
+    },
+    {
+      "document_id": "doc_lpl_payout_2025_12",
+      "filename": "lpl_payout_statement_2025-12.pdf",
+      "local_path": "sources/lpl_payout_statement_2025-12.pdf",
+      "document_type": "payout_statement",
+      "period": "2025-12",
+      "amount_dollars": 205640,
+      "s3_key_template": "uploads/{practiceId}/doc_lpl_payout_2025_12/lpl_payout_statement_2025-12.pdf",
+      "upload_status": "pending"
+    },
+    {
+      "document_id": "doc_lpl_payout_2026_01",
+      "filename": "lpl_payout_statement_2026-01.pdf",
+      "local_path": "sources/lpl_payout_statement_2026-01.pdf",
+      "document_type": "payout_statement",
+      "period": "2026-01",
+      "amount_dollars": 202750,
+      "s3_key_template": "uploads/{practiceId}/doc_lpl_payout_2026_01/lpl_payout_statement_2026-01.pdf",
+      "upload_status": "pending"
+    },
+    {
+      "document_id": "doc_lpl_payout_2026_02",
+      "filename": "lpl_payout_statement_2026-02.pdf",
+      "local_path": "sources/lpl_payout_statement_2026-02.pdf",
+      "document_type": "payout_statement",
+      "period": "2026-02",
+      "amount_dollars": 202750,
+      "s3_key_template": "uploads/{practiceId}/doc_lpl_payout_2026_02/lpl_payout_statement_2026-02.pdf",
+      "upload_status": "pending"
+    },
+    {
+      "document_id": "doc_lpl_payout_2026_03",
+      "filename": "lpl_payout_statement_2026-03.pdf",
+      "local_path": "sources/lpl_payout_statement_2026-03.pdf",
+      "document_type": "payout_statement",
+      "period": "2026-03",
+      "amount_dollars": 205640,
+      "s3_key_template": "uploads/{practiceId}/doc_lpl_payout_2026_03/lpl_payout_statement_2026-03.pdf",
+      "upload_status": "pending"
+    },
+    {
+      "document_id": "doc_lpl_payout_2026_04",
+      "filename": "lpl_payout_statement_2026-04.pdf",
+      "local_path": "sources/lpl_payout_statement_2026-04.pdf",
+      "document_type": "payout_statement",
+      "period": "2026-04",
+      "amount_dollars": 202750,
+      "s3_key_template": "uploads/{practiceId}/doc_lpl_payout_2026_04/lpl_payout_statement_2026-04.pdf",
+      "upload_status": "pending"
+    },
+    {
+      "document_id": "doc_lpl_payout_2026_05",
+      "filename": "lpl_payout_statement_2026-05.pdf",
+      "local_path": "sources/lpl_payout_statement_2026-05.pdf",
+      "document_type": "payout_statement",
+      "period": "2026-05",
+      "amount_dollars": 202750,
+      "s3_key_template": "uploads/{practiceId}/doc_lpl_payout_2026_05/lpl_payout_statement_2026-05.pdf",
+      "upload_status": "pending"
+    },
+    {
+      "document_id": "doc_lpl_payout_2026_06",
+      "filename": "lpl_payout_statement_2026-06.pdf",
+      "local_path": "sources/lpl_payout_statement_2026-06.pdf",
+      "document_type": "payout_statement",
+      "period": "2026-06",
+      "amount_dollars": 205640,
+      "s3_key_template": "uploads/{practiceId}/doc_lpl_payout_2026_06/lpl_payout_statement_2026-06.pdf",
+      "upload_status": "pending"
+    },
+    {
+      "document_id": "doc_lpl_payout_2026_07",
+      "filename": "lpl_payout_statement_2026-07.pdf",
+      "local_path": "sources/lpl_payout_statement_2026-07.pdf",
+      "document_type": "payout_statement",
+      "period": "2026-07",
+      "amount_dollars": 202750,
+      "s3_key_template": "uploads/{practiceId}/doc_lpl_payout_2026_07/lpl_payout_statement_2026-07.pdf",
+      "upload_status": "pending"
+    },
+    {
+      "document_id": "doc_lpl_payout_2026_08",
+      "filename": "lpl_payout_statement_2026-08.pdf",
+      "local_path": "sources/lpl_payout_statement_2026-08.pdf",
+      "document_type": "payout_statement",
+      "period": "2026-08",
+      "amount_dollars": 202750,
+      "s3_key_template": "uploads/{practiceId}/doc_lpl_payout_2026_08/lpl_payout_statement_2026-08.pdf",
+      "upload_status": "pending"
+    },
+    {
+      "document_id": "doc_lease_amendment_2026_07",
+      "filename": "lease_amendment_effective_2026-07-01.pdf",
+      "local_path": "sources/lease_amendment_effective_2026-07-01.pdf",
+      "document_type": "invoice",
+      "vendor_name": "Harbor Point Properties (FICTIONAL)",
+      "effective_date": "2026-07-01",
+      "previous_monthly_rent_dollars": 9800,
+      "monthly_rent_dollars": 12200,
+      "expense_account": "6200",
+      "s3_key_template": "uploads/{practiceId}/doc_lease_amendment_2026_07/lease_amendment_effective_2026-07-01.pdf",
+      "upload_status": "pending"
+    },
+    {
+      "document_id": "doc_compliance_invoice_2026_07",
+      "filename": "compliance_consultant_invoice_2026-07.pdf",
+      "local_path": "sources/compliance_consultant_invoice_2026-07.pdf",
+      "document_type": "invoice",
+      "vendor_name": "Clearwater Compliance Advisors (FICTIONAL)",
+      "invoice_number": "CCA-2026-07",
+      "invoice_date": "2026-07-05",
+      "amount_dollars": 2550,
+      "expense_account": "6600",
+      "s3_key_template": "uploads/{practiceId}/doc_compliance_invoice_2026_07/compliance_consultant_invoice_2026-07.pdf",
+      "upload_status": "pending"
+    },
+    {
+      "document_id": "doc_compliance_invoice_2026_08",
+      "filename": "compliance_consultant_invoice_2026-08.pdf",
+      "local_path": "sources/compliance_consultant_invoice_2026-08.pdf",
+      "document_type": "invoice",
+      "vendor_name": "Clearwater Compliance Advisors (FICTIONAL)",
+      "invoice_number": "CCA-2026-08",
+      "invoice_date": "2026-08-05",
+      "amount_dollars": 2550,
+      "expense_account": "6600",
+      "s3_key_template": "uploads/{practiceId}/doc_compliance_invoice_2026_08/compliance_consultant_invoice_2026-08.pdf",
+      "upload_status": "pending"
+    },
+    {
+      "document_id": "doc_compliance_invoice_2026_09",
+      "filename": "compliance_consultant_invoice_2026-09.pdf",
+      "local_path": "sources/compliance_consultant_invoice_2026-09.pdf",
+      "document_type": "invoice",
+      "vendor_name": "Clearwater Compliance Advisors (FICTIONAL)",
+      "invoice_number": "CCA-2026-09",
+      "invoice_date": "2026-09-05",
+      "amount_dollars": 2550,
+      "expense_account": "6600",
+      "s3_key_template": "uploads/{practiceId}/doc_compliance_invoice_2026_09/compliance_consultant_invoice_2026-09.pdf",
+      "upload_status": "pending"
+    }
+  ],
   "files": [
     {
       "filename": "orion_invoice_450_2026-09-02.pdf",
@@ -113,6 +287,9 @@
     {
       "filename": "lpl_payout_statement_sep_2026.pdf",
       "document_type": "payout_statement",
+      "document_id": "doc_lpl_payout_statement_sep_2026",
+      "s3_key_template": "uploads/{practiceId}/doc_lpl_payout_statement_sep_2026/lpl_payout_statement_sep_2026.pdf",
+      "upload_status": "pending",
       "vendor_name": "LPL Financial",
       "expected_fields": {
         "vendor_name": "LPL Financial",

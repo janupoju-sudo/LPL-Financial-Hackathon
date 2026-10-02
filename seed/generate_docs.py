@@ -240,13 +240,103 @@ def make_payout_statement(path: Path, *, filename: str) -> None:
     pdf.setFont("Helvetica-Bold", 11)
     pdf.drawString(0.9 * inch, 3.4 * inch, "Total paid")
     pdf.drawRightString(7.3 * inch, 3.4 * inch, "$205,228.00")
-    pdf.setFont("Helvetica", 10)
-    pdf.drawString(0.9 * inch, 2.9 * inch, "Actual: $2,478.00")
-    pdf.drawString(0.9 * inch, 2.55 * inch, "Expected: $2,890.00")
-    pdf.drawString(0.9 * inch, 2.2 * inch, "Shortfall: $412.00")
-    pdf.setFont("Helvetica-Bold", 12)
-    pdf.drawString(0.9 * inch, 1.75 * inch, "Status: short")
     add_footer(pdf, filename)
+    pdf.save()
+
+
+def make_lease_amendment(path: Path) -> None:
+    pdf = canvas.Canvas(str(path), pagesize=letter, pageCompression=0)
+    pdf.setTitle("Fictional Lease Amendment - July 2026")
+    add_watermark(pdf)
+    pdf.setFillColor(HexColor("#0F172A"))
+    pdf.setFont("Helvetica-Bold", 20)
+    pdf.drawString(0.75 * inch, 10.25 * inch, "Lease Amendment")
+    pdf.setFont("Helvetica", 11)
+    pdf.drawString(0.75 * inch, 9.85 * inch, "Harbor Point Properties (FICTIONAL)")
+    pdf.drawString(0.75 * inch, 9.3 * inch, "Tenant: Harbor Point Wealth (FICTIONAL)")
+    pdf.drawString(0.75 * inch, 8.85 * inch, "Effective date: 2026-07-01")
+    pdf.drawString(0.75 * inch, 8.4 * inch, "Previous monthly rent: $9,800.00")
+    pdf.setFont("Helvetica-Bold", 13)
+    pdf.drawString(0.75 * inch, 7.85 * inch, "New monthly rent: $12,200.00")
+    pdf.setFont("Helvetica", 10)
+    pdf.drawString(0.75 * inch, 7.25 * inch, "Account: 6200 - rent and occupancy")
+    pdf.drawString(0.75 * inch, 6.8 * inch, "This fictional amendment is effective for rent beginning July 2026.")
+    pdf.drawString(0.75 * inch, 1.3 * inch, "Local demo source document; cloud upload is pending.")
+    add_footer(pdf, path.name)
+    pdf.save()
+
+
+def make_compliance_invoice(path: Path, *, year: int, month: int) -> None:
+    tag = f"{year}-{month:02d}"
+    pdf = canvas.Canvas(str(path), pagesize=letter, pageCompression=0)
+    pdf.setTitle(f"Fictional Compliance Consultant Invoice {tag}")
+    add_watermark(pdf)
+    pdf.setFillColor(HexColor("#0F172A"))
+    pdf.setFont("Helvetica-Bold", 20)
+    pdf.drawString(0.75 * inch, 10.25 * inch, "Consulting Invoice")
+    pdf.setFont("Helvetica", 11)
+    pdf.drawString(0.75 * inch, 9.85 * inch, "Clearwater Compliance Advisors (FICTIONAL)")
+    pdf.drawString(0.75 * inch, 9.3 * inch, "Bill to: Harbor Point Wealth (FICTIONAL)")
+    pdf.drawString(0.75 * inch, 8.85 * inch, f"Invoice #: CCA-{year}-{month:02d}")
+    pdf.drawString(0.75 * inch, 8.4 * inch, f"Invoice date: {year}-{month:02d}-05")
+    pdf.drawString(0.75 * inch, 7.95 * inch, f"Service period: {tag}")
+    pdf.drawString(0.75 * inch, 7.5 * inch, "Regulatory compliance consulting")
+    pdf.setFont("Helvetica-Bold", 15)
+    pdf.drawRightString(7.5 * inch, 6.85 * inch, "$2,550.00")
+    pdf.setFont("Helvetica", 10)
+    pdf.drawString(0.75 * inch, 6.3 * inch, "Expense account: 6600 - compliance and licensing")
+    pdf.drawString(0.75 * inch, 1.3 * inch, "Fictional invoice for local demo-seed validation.")
+    add_footer(pdf, path.name)
+    pdf.save()
+
+
+def make_historical_payout_statement(path: Path, *, year: int, month: int) -> None:
+    tag = f"{year}-{month:02d}"
+    quarterly = month in {3, 6, 9, 12}
+    row_data = [
+        ("Advisory fees", "advisory", "", "$182,400.00"),
+        ("Mutual fund commissions", "commission", "", "$14,200.00"),
+        ("Monthly 12b-1 trails", "trail", "12b1", "$6,150.00"),
+    ]
+    total_paid = 202_750
+    if quarterly:
+        row_data.append(("Variable annuity trail, contract 4471", "trail", "4471", "$2,890.00"))
+        total_paid += 2_890
+
+    pdf = canvas.Canvas(str(path), pagesize=letter, pageCompression=0)
+    pdf.setTitle(f"Fictional LPL Payout Statement {tag}")
+    add_watermark(pdf)
+    pdf.setFillColor(HexColor("#0F172A"))
+    pdf.setFont("Helvetica-Bold", 20)
+    pdf.drawString(0.75 * inch, 10.25 * inch, "LPL Financial")
+    pdf.setFont("Helvetica", 11)
+    pdf.drawString(0.75 * inch, 9.85 * inch, f"Payout statement - {tag}")
+    pdf.setFont("Helvetica-Bold", 12)
+    pdf.drawString(0.75 * inch, 9.2 * inch, "Received payments")
+
+    headers = ["Description", "Source", "Reference", "Amount"]
+    col_x = [0.9 * inch, 3.0 * inch, 4.8 * inch, 6.5 * inch]
+    y = 8.65 * inch
+    pdf.setFillColor(HexColor("#E2E8F0"))
+    pdf.rect(0.7 * inch, y - 0.2 * inch, 7.1 * inch, 0.32 * inch, fill=1, stroke=1)
+    pdf.setFillColor(HexColor("#0F172A"))
+    pdf.setFont("Helvetica-Bold", 9)
+    for idx, header in enumerate(headers):
+        pdf.drawString(col_x[idx], y - 0.08 * inch, header)
+    pdf.setFont("Helvetica", 9)
+    for row_index, row in enumerate(row_data, start=1):
+        row_y = y - row_index * 0.42 * inch - 0.12 * inch
+        pdf.rect(0.7 * inch, row_y - 0.2 * inch, 7.1 * inch, 0.32 * inch, fill=0, stroke=1)
+        for col_index, value in enumerate(row):
+            if col_index == 3:
+                pdf.drawRightString(col_x[col_index] + 0.6 * inch, row_y, value)
+            else:
+                pdf.drawString(col_x[col_index], row_y, value)
+    pdf.setFont("Helvetica-Bold", 11)
+    pdf.drawString(0.9 * inch, 5.45 * inch, "Total paid")
+    pdf.drawRightString(7.3 * inch, 5.45 * inch, f"${total_paid:,.2f}")
+    pdf.drawString(0.75 * inch, 1.3 * inch, "Fictional historical sample; cloud upload is pending.")
+    add_footer(pdf, path.name)
     pdf.save()
 
 
@@ -287,6 +377,7 @@ def build_manifest(output_dir: Path) -> dict:
     return {
         "generated_by": "seed/generate_docs.py",
         "watermark": WATERMARK_TEXT,
+        "source_documents": source_document_manifest(),
         "files": [
             {
                 "filename": "orion_invoice_450_2026-09-02.pdf",
@@ -393,6 +484,9 @@ def build_manifest(output_dir: Path) -> dict:
             {
                 "filename": "lpl_payout_statement_sep_2026.pdf",
                 "document_type": "payout_statement",
+                "document_id": "doc_lpl_payout_statement_sep_2026",
+                "s3_key_template": "uploads/{practiceId}/doc_lpl_payout_statement_sep_2026/lpl_payout_statement_sep_2026.pdf",
+                "upload_status": "pending",
                 "vendor_name": "LPL Financial",
                 "expected_fields": {
                     "vendor_name": "LPL Financial",
@@ -418,8 +512,72 @@ def build_manifest(output_dir: Path) -> dict:
     }
 
 
+def source_document_manifest() -> list[dict[str, object]]:
+    documents = []
+    for year, month in _history_months():
+        tag = f"{year}-{month:02d}"
+        doc_id = f"doc_lpl_payout_{year}_{month:02d}"
+        filename = f"lpl_payout_statement_{tag}.pdf"
+        total_paid = 202_750 + (2_890 if month in {3, 6, 9, 12} else 0)
+        documents.append({
+            "document_id": doc_id,
+            "filename": filename,
+            "local_path": f"sources/{filename}",
+            "document_type": "payout_statement",
+            "period": tag,
+            "amount_dollars": total_paid,
+            "s3_key_template": f"uploads/{{practiceId}}/{doc_id}/{filename}",
+            "upload_status": "pending",
+        })
+
+    lease_id = "doc_lease_amendment_2026_07"
+    lease_filename = "lease_amendment_effective_2026-07-01.pdf"
+    documents.append({
+        "document_id": lease_id,
+        "filename": lease_filename,
+        "local_path": f"sources/{lease_filename}",
+        "document_type": "invoice",
+        "vendor_name": "Harbor Point Properties (FICTIONAL)",
+        "effective_date": "2026-07-01",
+        "previous_monthly_rent_dollars": 9_800,
+        "monthly_rent_dollars": 12_200,
+        "expense_account": "6200",
+        "s3_key_template": f"uploads/{{practiceId}}/{lease_id}/{lease_filename}",
+        "upload_status": "pending",
+    })
+
+    for month in (7, 8, 9):
+        tag = f"2026-{month:02d}"
+        doc_id = f"doc_compliance_invoice_2026_{month:02d}"
+        filename = f"compliance_consultant_invoice_{tag}.pdf"
+        documents.append({
+            "document_id": doc_id,
+            "filename": filename,
+            "local_path": f"sources/{filename}",
+            "document_type": "invoice",
+            "vendor_name": "Clearwater Compliance Advisors (FICTIONAL)",
+            "invoice_number": f"CCA-2026-{month:02d}",
+            "invoice_date": f"{tag}-05",
+            "amount_dollars": 2_550,
+            "expense_account": "6600",
+            "s3_key_template": f"uploads/{{practiceId}}/{doc_id}/{filename}",
+            "upload_status": "pending",
+        })
+
+    return documents
+
+
+def _history_months():
+    year, month = 2025, 9
+    while (year, month) <= (2026, 8):
+        yield year, month
+        year, month = (year + 1, 1) if month == 12 else (year, month + 1)
+
+
 def generate(output_dir: Path) -> Path:
     output_dir.mkdir(parents=True, exist_ok=True)
+    source_dir = output_dir / "sources"
+    source_dir.mkdir(parents=True, exist_ok=True)
 
     files = {
         "orion_invoice_450_2026-09-02.pdf": lambda: make_invoice(
@@ -463,6 +621,14 @@ def generate(output_dir: Path) -> Path:
 
     for _filename, fn in files.items():
         fn()
+
+    make_lease_amendment(source_dir / "lease_amendment_effective_2026-07-01.pdf")
+    for month in (7, 8, 9):
+        filename = f"compliance_consultant_invoice_2026-{month:02d}.pdf"
+        make_compliance_invoice(source_dir / filename, year=2026, month=month)
+    for year, month in _history_months():
+        filename = f"lpl_payout_statement_{year}-{month:02d}.pdf"
+        make_historical_payout_statement(source_dir / filename, year=year, month=month)
 
     manifest = build_manifest(output_dir)
     manifest_path = output_dir / "manifest.json"
