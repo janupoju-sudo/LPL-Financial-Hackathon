@@ -10,7 +10,7 @@ import { Revenue } from '../components/revenue-view';
 import financialsFixture from '../mocks/financials.json';
 import reconciliationFixture from '../mocks/reconciliation.json';
 import type { Financials, Reconciliation } from './types';
-import { normalizeFinancials, normalizeReconciliation, type LegacyFinancials } from './contracts';
+import { normalizeBillDetail, normalizeFinancials, normalizeReconciliation, type LegacyFinancials } from './contracts';
 import { validateLocalApi } from './local-mode';
 
 test('approval enforces role, unblocks on vendor documents, and updates balanced financials', async () => {
@@ -126,4 +126,13 @@ test('live API payloads (C backend shape) normalize to frontend types', async ()
   assert.equal(rule.id, 'r-docs');
   assert.equal(rule.action, 'require_docs');
   assert.equal(toApiRule({ ...rule, action: 'require_docs' }).action, 'hold');
+});
+
+test('bill detail keeps the audit trail and payment from the live API', () => {
+  const detail = normalizeBillDetail({ billId: 'bill_1', vendorName: 'Orion Software LLC', amount: 1850, status: 'scheduled', glAccount: '6300', glAccountName: 'Technology', requiredApprovers: ['partner'], audit: [{ at: '2026-07-16T10:12:00+00:00', actor: 'raj@harborpoint.example', action: 'approved', detail: 'Approved' }], payment: { method: 'ACH (mock)', scheduledFor: '2026-07-25', confirmation: 'MOCK-1' } });
+  assert.equal(detail.id, 'bill_1');
+  assert.equal(detail.glAccount, '6300 · Technology');
+  assert.deepEqual(detail.requiredApprovers, ['partner']);
+  assert.equal(detail.audit[0].actor, 'raj@harborpoint.example');
+  assert.equal(detail.payment?.scheduledFor, '2026-07-25');
 });
