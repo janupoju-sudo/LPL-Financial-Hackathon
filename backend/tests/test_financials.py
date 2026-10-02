@@ -1,8 +1,8 @@
 import unittest
 from datetime import date
 
-from functions.financials import api, kpis, periods, statements, valuation
-from tests.fixtures import PRACTICE, sample_entries
+from financials import api, kpis, periods, statements, valuation
+from fixtures import PRACTICE, sample_entries
 
 
 class Periods(unittest.TestCase):

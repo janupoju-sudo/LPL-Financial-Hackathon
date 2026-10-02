@@ -1,0 +1,139 @@
+{
+  "Comment": "Ledgerline ApproveBill: rules -> (auto | wait for approver | hold for docs) -> ledger -> mock payment",
+  "StartAt": "EvaluateRules",
+  "States": {
+    "EvaluateRules": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${EvaluateRulesFunctionArn}",
+        "Payload": { "practiceId.$": "$.practiceId", "billId.$": "$.billId" }
+      },
+      "ResultSelector": {
+        "decision.$": "$.Payload.decision",
+        "hits.$": "$.Payload.hits",
+        "requiredApprovers.$": "$.Payload.requiredApprovers"
+      },
+      "ResultPath": "$.evaluation",
+      "Retry": [{ "ErrorEquals": ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException", "Lambda.TooManyRequestsException"], "IntervalSeconds": 1, "MaxAttempts": 3, "BackoffRate": 2 }],
+      "Next": "RouteDecision"
+    },
+    "RouteDecision": {
+      "Type": "Choice",
+      "Choices": [
+        { "Variable": "$.evaluation.decision", "StringEquals": "auto_approve", "Next": "PostLedger" },
+        { "Variable": "$.evaluation.decision", "StringEquals": "on_hold", "Next": "WaitForRequirements" },
+        { "Variable": "$.evaluation.decision", "StringEquals": "blocked", "Next": "MarkRejected" }
+      ],
+      "Default": "WaitForApproval"
+    },
+    "WaitForApproval": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke.waitForTaskToken",
+      "Parameters": {
+        "FunctionName": "${StoreTaskTokenFunctionArn}",
+        "Payload": {
+          "practiceId.$": "$.practiceId",
+          "billId.$": "$.billId",
+          "taskToken.$": "$$.Task.Token",
+          "waitingFor": "approval",
+          "requiredApprovers.$": "$.evaluation.requiredApprovers"
+        }
+      },
+      "ResultPath": "$.approval",
+      "TimeoutSeconds": 604800,
+      "Retry": [{ "ErrorEquals": ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException", "Lambda.TooManyRequestsException"], "IntervalSeconds": 1, "MaxAttempts": 3, "BackoffRate": 2 }],
+      "Catch": [{ "ErrorEquals": ["States.Timeout"], "ResultPath": "$.error", "Next": "MarkRejected" }],
+      "Next": "RouteApproval"
+    },
+    "RouteApproval": {
+      "Type": "Choice",
+      "Choices": [
+        { "Variable": "$.approval.decision", "StringEquals": "approve", "Next": "PostLedger" },
+        { "Variable": "$.approval.decision", "StringEquals": "reevaluate", "Next": "EvaluateRules" }
+      ],
+      "Default": "MarkRejected"
+    },
+    "WaitForRequirements": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke.waitForTaskToken",
+      "Parameters": {
+        "FunctionName": "${StoreTaskTokenFunctionArn}",
+        "Payload": {
+          "practiceId.$": "$.practiceId",
+          "billId.$": "$.billId",
+          "taskToken.$": "$$.Task.Token",
+          "waitingFor": "documents",
+          "requiredApprovers": []
+        }
+      },
+      "ResultPath": "$.hold",
+      "TimeoutSeconds": 1209600,
+      "Retry": [{ "ErrorEquals": ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException", "Lambda.TooManyRequestsException"], "IntervalSeconds": 1, "MaxAttempts": 3, "BackoffRate": 2 }],
+      "Catch": [{ "ErrorEquals": ["States.Timeout"], "ResultPath": "$.error", "Next": "MarkRejected" }],
+      "Next": "RouteHold"
+    },
+    "RouteHold": {
+      "Type": "Choice",
+      "Choices": [
+        { "Variable": "$.hold.decision", "StringEquals": "approve", "Next": "PostLedger" },
+        { "Variable": "$.hold.decision", "StringEquals": "reject", "Next": "MarkRejected" }
+      ],
+      "Default": "EvaluateRules"
+    },
+    "PostLedger": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${PostLedgerFunctionArn}",
+        "Payload": { "practiceId.$": "$.practiceId", "billId.$": "$.billId" }
+      },
+      "ResultSelector": { "entryId.$": "$.Payload.entryId" },
+      "ResultPath": "$.ledger",
+      "Retry": [{ "ErrorEquals": ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException", "Lambda.TooManyRequestsException"], "IntervalSeconds": 1, "MaxAttempts": 3, "BackoffRate": 2 }],
+      "Next": "SchedulePayment"
+    },
+    "SchedulePayment": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${SchedulePaymentFunctionArn}",
+        "Payload": { "practiceId.$": "$.practiceId", "billId.$": "$.billId" }
+      },
+      "ResultSelector": { "scheduledFor.$": "$.Payload.scheduledFor", "confirmation.$": "$.Payload.confirmation" },
+      "ResultPath": "$.payment",
+      "Retry": [{ "ErrorEquals": ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException", "Lambda.TooManyRequestsException"], "IntervalSeconds": 1, "MaxAttempts": 3, "BackoffRate": 2 }],
+      "Next": "EmitLedgerUpdated"
+    },
+    "EmitLedgerUpdated": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::events:putEvents",
+      "Parameters": {
+        "Entries": [{
+          "EventBusName": "${EventBusName}",
+          "Source": "ledgerline.workflow",
+          "DetailType": "LedgerUpdated",
+          "Detail": {
+            "practiceId.$": "$.practiceId",
+            "billId.$": "$.billId",
+            "status": "scheduled",
+            "accrualEntryId.$": "$.ledger.entryId"
+          }
+        }]
+      },
+      "ResultPath": null,
+      "End": true
+    },
+    "MarkRejected": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${MarkRejectedFunctionArn}",
+        "Payload": { "input.$": "$" }
+      },
+      "ResultPath": null,
+      "Retry": [{ "ErrorEquals": ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException", "Lambda.TooManyRequestsException"], "IntervalSeconds": 1, "MaxAttempts": 3, "BackoffRate": 2 }],
+      "End": true
+    }
+  }
+}

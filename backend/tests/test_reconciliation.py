@@ -1,7 +1,7 @@
 import unittest
 
-from functions.financials import reconciliation as rec
-from tests.fixtures import FEE_SCHEDULE, PAYOUT_SEP
+from financials import reconciliation as rec
+from fixtures import FEE_SCHEDULE, PAYOUT_SEP
 
 
 class Reconciliation(unittest.TestCase):

@@ -1,0 +1,333 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Ledgerline backend (LPL Financial Hackathon) - HTTP API, approval workflows (Step Functions),
+  double-entry ledger (DynamoDB), Object Lock document library (S3), Cognito auth, EventBridge.
+
+Parameters:
+  Stage:
+    Type: String
+    Default: dev
+  DefaultPracticeId:
+    Type: String
+    Default: p1
+  RetentionDays:
+    Type: Number
+    Default: 1
+    Description: Object Lock GOVERNANCE retention applied to each uploaded document (keep small for the demo)
+  ReviewConfidenceThreshold:
+    Type: String
+    Default: "0.8"
+  AllowSelfApproval:
+    Type: String
+    Default: "false"
+    AllowedValues: ["true", "false"]
+
+Globals:
+  Function:
+    Runtime: python3.12
+    Architectures: [arm64]
+    CodeUri: src/
+    Timeout: 20
+    MemorySize: 256
+    Tracing: Active
+    Environment:
+      Variables:
+        TABLE_NAME: !Ref LedgerTable
+        DOCS_BUCKET: !Ref DocsBucket
+        DEFAULT_PRACTICE_ID: !Ref DefaultPracticeId
+        EVENT_BUS_NAME: !Ref AppEventBus
+        REVIEW_CONFIDENCE_THRESHOLD: !Ref ReviewConfidenceThreshold
+        ALLOW_SELF_APPROVAL: !Ref AllowSelfApproval
+        RETENTION_DAYS: !Ref RetentionDays
+
+Resources:
+  # ---------------------------------------------------------------- data
+  LedgerTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub ledgerline-${Stage}
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - { AttributeName: PK, AttributeType: S }
+        - { AttributeName: SK, AttributeType: S }
+      KeySchema:
+        - { AttributeName: PK, KeyType: HASH }
+        - { AttributeName: SK, KeyType: RANGE }
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+
+  DocsBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      ObjectLockEnabled: true
+      VersioningConfiguration:
+        Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      CorsConfiguration:
+        CorsRules:
+          - AllowedMethods: [PUT, GET]
+            AllowedOrigins: ["*"]
+            AllowedHeaders: ["*"]
+            ExposedHeaders: [ETag]
+            MaxAge: 3000
+      NotificationConfiguration:
+        EventBridgeConfiguration:
+          EventBridgeEnabled: true
+
+  AppEventBus:
+    Type: AWS::Events::EventBus
+    Properties:
+      Name: !Sub ledgerline-${Stage}
+
+  # ---------------------------------------------------------------- auth
+  UserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Sub ledgerline-${Stage}
+      UsernameAttributes: [email]
+      AutoVerifiedAttributes: [email]
+      Schema:
+        - Name: practiceId
+          AttributeDataType: String
+          Mutable: true
+
+  UserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      UserPoolId: !Ref UserPool
+      ClientName: !Sub ledgerline-web-${Stage}
+      GenerateSecret: false
+      ExplicitAuthFlows:
+        - ALLOW_USER_SRP_AUTH
+        - ALLOW_USER_PASSWORD_AUTH
+        - ALLOW_ADMIN_USER_PASSWORD_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+
+  OwnerGroup:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties: { UserPoolId: !Ref UserPool, GroupName: owner, Description: Practice owner / lead advisor }
+  PartnerGroup:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties: { UserPoolId: !Ref UserPool, GroupName: partner, Description: Senior partner - approves large bills }
+  OpsGroup:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties: { UserPoolId: !Ref UserPool, GroupName: ops, Description: Operations associate }
+  BookkeeperGroup:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties: { UserPoolId: !Ref UserPool, GroupName: lpl_bookkeeper, Description: LPL bookkeeper / CFO specialist }
+
+  # ---------------------------------------------------------------- API
+  HttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      CorsConfiguration:
+        AllowOrigins: ["*"]
+        AllowHeaders: [authorization, content-type]
+        AllowMethods: [GET, POST, PATCH, OPTIONS]
+        MaxAge: 600
+      Auth:
+        DefaultAuthorizer: CognitoJwt
+        Authorizers:
+          CognitoJwt:
+            IdentitySource: $request.header.Authorization
+            JwtConfiguration:
+              issuer: !Sub https://cognito-idp.${AWS::Region}.amazonaws.com/${UserPool}
+              audience:
+                - !Ref UserPoolClient
+
+  DocumentsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: handlers.documents.handler
+      Policies:
+        - DynamoDBCrudPolicy: { TableName: !Ref LedgerTable }
+        - S3CrudPolicy: { BucketName: !Ref DocsBucket }
+      Events:
+        UploadUrl: { Type: HttpApi, Properties: { ApiId: !Ref HttpApi, Path: /documents/upload-url, Method: POST } }
+        ListDocuments: { Type: HttpApi, Properties: { ApiId: !Ref HttpApi, Path: /documents, Method: GET } }
+        GetDocument: { Type: HttpApi, Properties: { ApiId: !Ref HttpApi, Path: "/documents/{id}", Method: GET } }
+
+  VendorsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: handlers.vendors.handler
+      Policies:
+        - DynamoDBReadPolicy: { TableName: !Ref LedgerTable }
+      Events:
+        ListVendors: { Type: HttpApi, Properties: { ApiId: !Ref HttpApi, Path: /vendors, Method: GET } }
+
+  BillsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: handlers.bills.handler
+      Environment:
+        Variables:
+          APPROVE_SM_ARN: !Ref ApproveBillStateMachine
+      Policies:
+        - DynamoDBCrudPolicy: { TableName: !Ref LedgerTable }
+        - StepFunctionsExecutionPolicy: { StateMachineName: !GetAtt ApproveBillStateMachine.Name }
+        - Statement:
+            - Effect: Allow
+              Action: [states:SendTaskSuccess, states:SendTaskFailure]
+              Resource: "*"   # callback task tokens are not resource-scoped
+      Events:
+        ListBills: { Type: HttpApi, Properties: { ApiId: !Ref HttpApi, Path: /bills, Method: GET } }
+        GetBill: { Type: HttpApi, Properties: { ApiId: !Ref HttpApi, Path: "/bills/{id}", Method: GET } }
+        Decide: { Type: HttpApi, Properties: { ApiId: !Ref HttpApi, Path: "/bills/{id}/decision", Method: POST } }
+        Confirm: { Type: HttpApi, Properties: { ApiId: !Ref HttpApi, Path: "/bills/{id}/confirm", Method: POST } }
+        Receive: { Type: HttpApi, Properties: { ApiId: !Ref HttpApi, Path: "/bills/{id}/receive", Method: POST } }
+
+  RulesFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: handlers.rules.handler
+      Policies:
+        - DynamoDBCrudPolicy: { TableName: !Ref LedgerTable }
+      Events:
+        ListRules: { Type: HttpApi, Properties: { ApiId: !Ref HttpApi, Path: /rules, Method: GET } }
+        CreateRule: { Type: HttpApi, Properties: { ApiId: !Ref HttpApi, Path: /rules, Method: POST } }
+        UpdateRule: { Type: HttpApi, Properties: { ApiId: !Ref HttpApi, Path: "/rules/{id}", Method: PATCH } }
+
+  # ---------------------------------------------------------------- workflow
+  CreateBillFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: workflow.create_bill.handler
+      Environment:
+        Variables:
+          APPROVE_SM_ARN: !Ref ApproveBillStateMachine
+      Policies:
+        - DynamoDBCrudPolicy: { TableName: !Ref LedgerTable }
+        - StepFunctionsExecutionPolicy: { StateMachineName: !GetAtt ApproveBillStateMachine.Name }
+
+  EvaluateRulesFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: workflow.evaluate_rules.handler
+      Policies:
+        - DynamoDBCrudPolicy: { TableName: !Ref LedgerTable }
+
+  StoreTaskTokenFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: workflow.store_task_token.handler
+      Policies:
+        - DynamoDBCrudPolicy: { TableName: !Ref LedgerTable }
+        - EventBridgePutEventsPolicy: { EventBusName: !Ref AppEventBus }
+
+  PostLedgerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: workflow.post_ledger.handler
+      Policies:
+        - DynamoDBCrudPolicy: { TableName: !Ref LedgerTable }
+
+  SchedulePaymentFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: workflow.schedule_payment.handler
+      Policies:
+        - DynamoDBCrudPolicy: { TableName: !Ref LedgerTable }
+
+  MarkRejectedFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: workflow.mark_rejected.handler
+      Policies:
+        - DynamoDBCrudPolicy: { TableName: !Ref LedgerTable }
+        - EventBridgePutEventsPolicy: { EventBusName: !Ref AppEventBus }
+
+  ResumeHeldBillsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: workflow.resume_held_bills.handler
+      Policies:
+        - DynamoDBCrudPolicy: { TableName: !Ref LedgerTable }
+        - Statement:
+            - Effect: Allow
+              Action: [states:SendTaskSuccess]
+              Resource: "*"
+      Events:
+        VendorUpdated:
+          Type: EventBridgeRule
+          Properties:
+            EventBusName: !Ref AppEventBus
+            Pattern:
+              detail-type: [VendorUpdated]
+
+  LockDocumentFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: workflow.lock_document.handler
+      Policies:
+        - DynamoDBCrudPolicy: { TableName: !Ref LedgerTable }
+        - Statement:
+            - Effect: Allow
+              Action: [s3:PutObjectRetention, s3:GetObjectRetention]
+              Resource: !Sub ${DocsBucket.Arn}/uploads/*
+      Events:
+        DocumentUploaded:
+          Type: EventBridgeRule
+          Properties:
+            Pattern:
+              source: [aws.s3]
+              detail-type: [Object Created]
+              detail:
+                bucket:
+                  name: [!Ref DocsBucket]
+                object:
+                  key: [{ prefix: uploads/ }]
+
+  ApproveBillStateMachine:
+    Type: AWS::Serverless::StateMachine
+    Properties:
+      Name: !Sub ledgerline-approve-bill-${Stage}
+      Type: STANDARD
+      DefinitionUri: statemachines/approve_bill.asl.json
+      DefinitionSubstitutions:
+        EvaluateRulesFunctionArn: !GetAtt EvaluateRulesFunction.Arn
+        StoreTaskTokenFunctionArn: !GetAtt StoreTaskTokenFunction.Arn
+        PostLedgerFunctionArn: !GetAtt PostLedgerFunction.Arn
+        SchedulePaymentFunctionArn: !GetAtt SchedulePaymentFunction.Arn
+        MarkRejectedFunctionArn: !GetAtt MarkRejectedFunction.Arn
+        EventBusName: !Ref AppEventBus
+      Policies:
+        - LambdaInvokePolicy: { FunctionName: !Ref EvaluateRulesFunction }
+        - LambdaInvokePolicy: { FunctionName: !Ref StoreTaskTokenFunction }
+        - LambdaInvokePolicy: { FunctionName: !Ref PostLedgerFunction }
+        - LambdaInvokePolicy: { FunctionName: !Ref SchedulePaymentFunction }
+        - LambdaInvokePolicy: { FunctionName: !Ref MarkRejectedFunction }
+        - EventBridgePutEventsPolicy: { EventBusName: !Ref AppEventBus }
+
+Outputs:
+  ApiUrl:
+    Description: Base URL for the frontend (NEXT_PUBLIC_API_URL)
+    Value: !Sub https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com
+  UserPoolId:
+    Value: !Ref UserPool
+  UserPoolClientId:
+    Value: !Ref UserPoolClient
+  TableName:
+    Value: !Ref LedgerTable
+  DocsBucketName:
+    Value: !Ref DocsBucket
+  EventBusName:
+    Value: !Ref AppEventBus
+  ApproveBillStateMachineArn:
+    Value: !Ref ApproveBillStateMachine
+  CreateBillFunctionArn:
+    Description: Invoke from the IngestDocument state machine (role B)
+    Value: !GetAtt CreateBillFunction.Arn
