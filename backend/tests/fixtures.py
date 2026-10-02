@@ -42,13 +42,14 @@ def sample_entries():
                                    ("4200", 0, com), ("4300", 0, trl)],
                       "LPL payout", doc=f"payout-{mm}")
         e += _journal(f"{mm}-25", [("6100", 77_000, 0), ("1000", 0, 77_000)], "Payroll")
-        e += _bill(f"{mm}-01", f"{mm}-05", "6200", 9_800 if q3 else 7_400, "Summit Office Partners rent")
+        e += _bill(f"{mm}-01", f"{mm}-05", "6200", 9_800 if q3 else 7_400, "Summit Office Partners rent",
+                   doc=f"rent-{mm}")
         e += _bill(f"{mm}-27", f"{mm}-28", "6400", 32_400 if q3 else 31_000, "LPL platform fees")
         e += _bill(f"{mm}-10", f"{mm}-20", "6300", 6_200, "Brightline IT Services")
         e += _bill(f"{mm}-12", f"{mm}-22", "6500", 5_400, "Northgate Marketing")
         e += _bill(f"{mm}-15", f"{mm}-25", "6700", 2_100 + 100 * m, "Client events")
         if q3:
-            e += _bill(f"{mm}-17", f"{mm}-27", "6600", 850, "Clearpath Compliance")
+            e += _bill(f"{mm}-17", f"{mm}-27", "6600", 850, "Clearpath Compliance", doc=f"clearpath-{mm}")
     e += _journal("2026-06-30", [("3100", 40_000, 0), ("1000", 0, 40_000)], "Owner distribution")
     e += _journal("2026-08-31", [("6100", 11_000, 0), ("2200", 0, 11_000)], "Staff bonus accrual")
     e += _journal("2026-09-15", [("2200", 11_000, 0), ("1000", 0, 11_000)], "Staff bonus paid")
@@ -76,4 +77,19 @@ PAYOUT_SEP = [
     {"id": "x2", "source": "commission", "label": "Mutual fund commissions", "actual": 14_200_00, "docId": "d3"},
     {"id": "x3", "source": "trail", "ref": "12b1", "label": "12b-1 trails", "actual": 6_150_00, "docId": "d3"},
     {"id": "x4", "source": "trail", "ref": "4471", "label": "VA trail 4471", "actual": 2_478_00, "docId": "d3"},
+]
+
+
+# Document list as GET /documents returns it, plus s3Key.
+DOCUMENTS = [
+    {"id": "d1", "type": "invoice", "filename": "Brightline_INV-2291.pdf", "vendorName": "Brightline IT Services",
+     "amount": 1240.0, "createdAt": "2026-09-29", "s3Key": "uploads/d1.pdf"},
+    {"id": "rent-2026-07", "type": "invoice", "filename": "Summit_Lease_Amendment_Q3.pdf",
+     "vendorName": "Summit Office Partners", "amount": 9800.0, "createdAt": "2026-07-01", "s3Key": "uploads/rent7.pdf"},
+    {"id": "clearpath-2026-09", "type": "invoice", "filename": "Clearpath_Compliance_0917.pdf",
+     "vendorName": "Clearpath Compliance", "amount": 850.0, "createdAt": "2026-09-17", "s3Key": "uploads/cp9.pdf"},
+    {"id": "payout-2026-09", "type": "payout_statement", "filename": "LPL_Payout_Sep2026.pdf",
+     "vendorName": "LPL Financial", "amount": 218000.0, "createdAt": "2026-09-30", "s3Key": "uploads/payout9.pdf"},
+    {"id": "w9-north", "type": "w9", "filename": "Northgate_W9.pdf", "vendorName": "Northgate Marketing",
+     "amount": None, "createdAt": "2026-06-12", "s3Key": "uploads/w9.pdf"},
 ]
