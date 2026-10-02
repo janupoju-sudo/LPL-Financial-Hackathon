@@ -136,6 +136,33 @@ S3 objects are never deleted or overwritten; Object Lock retention remains in
 force. Old uploads may remain in S3 without DynamoDB references. The reset does
 not invoke `seed.py` or `seed_ddb.py`.
 
+### One-time compliance migration for PR #28
+
+A normal demo reset preserves seeded compliance entries and therefore does not
+unblock PR #28 on a table populated by PR #27. Use the separate migration mode
+to replace only the known combined July-September 2026 $5,650 compliance accruals
+and payments with $3,100 base and $2,550 consultant accruals/payments. The consultant
+entries cite that month's $2,550 invoice. Totals and all other ledger entries stay
+unchanged; no reseed is required to complete this replacement.
+
+After PR #28 and the reset PR are merged, the live-account owner pauses uploads
+and confirms all ingest/approval executions are terminal, then reviews:
+
+```bash
+cd backend
+python scripts/reset_demo.py --table ledgerline-dev --practice p1 --migrate-compliance
+```
+
+Only the live-account owner applies the reviewed migration by adding `--execute`.
+The replacement is transactional per month and safe to resume. It rejects wrong
+amounts, missing invoice metadata, mixed/partial journal layouts, older aggregate
+expense layouts, and ledger changes after planning. It does not clear demo bills,
+documents, payouts, rules, vendors, or S3 objects, and never invokes the seed.
+The seed owner can subsequently rerun their usual seed/upload command; it will
+skip the already-posted split journals. Use the normal reset mode separately for
+rehearsals. The bill-status guard does not inspect Step Functions, so operator
+confirmation that workflows have stopped is still required.
+
 ---
 
 ## Contract for B (Document AI / ingest)

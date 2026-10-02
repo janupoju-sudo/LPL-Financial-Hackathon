@@ -222,3 +222,186 @@ def test_cli_without_execute_only_previews(aws, monkeypatch, capsys):
     assert "Dry-run reset preview" in capsys.readouterr().out
     for prefix, items in before.items():
         assert _items("p1", prefix) == items
+
+
+def _seed_combined_compliance(practice_id, month, amount=5_650):
+    tag = f"2026-{month:02d}"
+    entry_date = f"{tag}-{30 if month == 9 else 31}"
+    document_id = f"doc_compliance_invoice_2026_{month:02d}"
+    ddb.put_item(practice_id, f"DOC#{document_id}", {
+        "documentId": document_id, "amount": 2_550, "type": "invoice",
+        "s3Key": f"seed-sources/{practice_id}/{document_id}/invoice.pdf",
+        "uploadedBy": "role-e-seed", "status": "processed",
+    })
+    ledger.post_journal(
+        practice_id, f"j-expense-compliance-{tag}", entry_date,
+        ledger.bill_accrual_lines(amount, "6600"), "Legacy combined compliance",
+        source_doc_id=document_id, source_type="seed", source_id=document_id,
+    )
+    ledger.post_journal(
+        practice_id, f"j-expense-paid-compliance-{tag}", entry_date,
+        ledger.bill_payment_lines(amount), "Legacy combined compliance payment",
+        source_doc_id=document_id, source_type="seed", source_id=document_id,
+    )
+
+
+def test_compliance_migration_preserves_totals_sources_and_other_practice(aws):
+    _seed_practice("p1")
+    _seed_practice("p2")
+    for month in (7, 8, 9):
+        _seed_combined_compliance("p1", month)
+        _seed_combined_compliance("p2", month)
+    before_ledger = _items("p1", "LEDGER#")
+    balances_before = ledger.account_balances(before_ledger)
+    preserved_before = {prefix: _items("p1", prefix)
+                        for prefix in ("META", "DOC#", "BILL#", "VENDOR#", "RULE#", "REV#")}
+    other_before = _items("p2", "LEDGER#")
+
+    plan = reset_demo.build_compliance_migration_plan("p1")
+    assert [month["period"] for month in plan["months"]] == ["2026-07", "2026-08", "2026-09"]
+    assert _items("p1", "LEDGER#") == before_ledger  # preview is read-only
+    assert reset_demo.execute_compliance_migration(plan) == ["2026-07", "2026-08", "2026-09"]
+
+    after = _items("p1", "LEDGER#")
+    assert ledger.account_balances(after) == balances_before
+    assert _items("p2", "LEDGER#") == other_before
+    for prefix, items in preserved_before.items():
+        assert _items("p1", prefix) == items
+    for month in (7, 8, 9):
+        tag = f"2026-{month:02d}"
+        assert not any(line["journalId"] in {
+            f"j-expense-compliance-{tag}", f"j-expense-paid-compliance-{tag}"
+        } for line in after)
+        base = [line for line in after if line["journalId"] == f"j-expense-compliance-base-{tag}"]
+        consultant = [line for line in after
+                      if line["journalId"] == f"j-expense-compliance-consultant-{tag}"]
+        assert sum(line["debit"] for line in base) == 310_000
+        assert sum(line["debit"] for line in consultant) == 255_000
+        assert all(line["sourceDocId"] is None for line in base)
+        assert all(line["sourceDocId"] == f"doc_compliance_invoice_2026_{month:02d}"
+                   for line in consultant)
+    repeat = reset_demo.build_compliance_migration_plan("p1")
+    assert repeat["months"] == []
+    assert reset_demo.execute_compliance_migration(repeat) == []
+    assert _items("p1", "LEDGER#") == after
+
+
+def test_compliance_migration_preflights_all_months_before_any_write(aws):
+    _seed_combined_compliance("p1", 7)
+    _seed_combined_compliance("p1", 8, amount=5_000)
+    before = _items("p1", "LEDGER#")
+    with pytest.raises(RuntimeError, match="not the expected"):
+        reset_demo.build_compliance_migration_plan("p1")
+    assert _items("p1", "LEDGER#") == before
+
+
+def test_compliance_migration_refuses_partial_or_mixed_journals(aws):
+    _seed_combined_compliance("p1", 7)
+    ledger.post_journal(
+        "p1", "j-expense-compliance-base-2026-07", "2026-07-31",
+        ledger.bill_accrual_lines(3_100, "6600"), "Partial split", source_type="seed",
+    )
+    before = _items("p1", "LEDGER#")
+    with pytest.raises(RuntimeError, match="both combined and split"):
+        reset_demo.build_compliance_migration_plan("p1")
+    assert _items("p1", "LEDGER#") == before
+
+
+def test_compliance_migration_requires_matching_consultant_document(aws):
+    _seed_combined_compliance("p1", 7)
+    ddb.update_item("p1", "DOC#doc_compliance_invoice_2026_07", set_fields={"amount": 3_100})
+    with pytest.raises(RuntimeError, match="matching"):
+        reset_demo.build_compliance_migration_plan("p1")
+
+
+def test_compliance_migration_refuses_older_aggregate_layout(aws):
+    ledger.post_journal(
+        "p1", "j-expenses-2026-07", "2026-07-31",
+        ledger.bill_accrual_lines(5_650, "6600"), "Old aggregate", source_type="seed",
+    )
+    with pytest.raises(RuntimeError, match="older aggregate"):
+        reset_demo.build_compliance_migration_plan("p1")
+
+
+def test_compliance_transaction_refuses_changed_rows_without_partial_deletion(aws):
+    _seed_combined_compliance("p1", 7)
+    plan = reset_demo.build_compliance_migration_plan("p1")
+    row = next(line for line in plan["months"][0]["old"] if line["account"] == "6600")
+    ddb.update_item("p1", row["SK"], set_fields={"debit": 565_001})
+    before = _items("p1", "LEDGER#")
+    with pytest.raises(RuntimeError, match="changed after preview"):
+        reset_demo.execute_compliance_migration(plan)
+    assert _items("p1", "LEDGER#") == before
+
+
+def test_compliance_migration_refuses_active_workflows_and_cross_practice_plan(aws):
+    _seed_combined_compliance("p1", 7)
+    plan = reset_demo.build_compliance_migration_plan("p1")
+    plan["months"][0]["new"][0]["PK"] = "PRACTICE#p2"
+    before = _items("p1", "LEDGER#")
+    with pytest.raises(RuntimeError, match="outside the selected practice"):
+        reset_demo.execute_compliance_migration(plan)
+    assert _items("p1", "LEDGER#") == before
+    plan = reset_demo.build_compliance_migration_plan("p1")
+    repo.put_bill("p1", {"billId": "active", "status": "pending_docs"})
+    with pytest.raises(RuntimeError, match="Active bill workflows"):
+        reset_demo.execute_compliance_migration(plan)
+    assert _items("p1", "LEDGER#") == before
+
+
+def test_compliance_migration_cli_defaults_to_preview_without_demo_cleanup(aws, monkeypatch, capsys):
+    _seed_practice("p1")
+    _seed_combined_compliance("p1", 7)
+    before = {prefix: _items("p1", prefix) for prefix in ("DOC#", "BILL#", "LEDGER#", "REV#")}
+    monkeypatch.setattr(sys, "argv", [
+        "reset_demo.py", "--table", "ledgerline-test", "--practice", "p1", "--migrate-compliance"
+    ])
+    reset_demo.main()
+    assert "Compliance migration preview" in capsys.readouterr().out
+    for prefix, items in before.items():
+        assert _items("p1", prefix) == items
+
+
+def test_compliance_migration_resumes_after_an_interrupted_month(aws, monkeypatch):
+    from botocore.exceptions import ClientError
+
+    for month in (7, 8, 9):
+        _seed_combined_compliance("p1", month)
+    before_balances = ledger.account_balances(_items("p1", "LEDGER#"))
+    client = ddb.table().meta.client
+    real_transaction = client.transact_write_items
+    calls = 0
+
+    def interrupt_second_month(**kwargs):
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise ClientError({"Error": {"Code": "TransactionCanceledException"}}, "TransactWriteItems")
+        return real_transaction(**kwargs)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(client, "transact_write_items", interrupt_second_month)
+        with pytest.raises(RuntimeError, match="2026-08 changed"):
+            reset_demo.execute_compliance_migration(reset_demo.build_compliance_migration_plan("p1"))
+    repeat = reset_demo.build_compliance_migration_plan("p1")
+    assert repeat["already_split"] == ["2026-07"]
+    assert reset_demo.execute_compliance_migration(repeat) == ["2026-08", "2026-09"]
+    assert ledger.account_balances(_items("p1", "LEDGER#")) == before_balances
+
+
+def test_migration_unblocks_new_seed_without_duplicate_compliance(aws, monkeypatch):
+    import seed_ddb
+
+    for month in (7, 8, 9):
+        _seed_combined_compliance("p1", month)
+    with pytest.raises(RuntimeError, match="combined compliance"):
+        seed_ddb.seed("p1", live_sept=True)
+    reset_demo.execute_compliance_migration(reset_demo.build_compliance_migration_plan("p1"))
+    # S3 uploads belong to the seed owner; this test exercises only ledger compatibility.
+    monkeypatch.setattr(seed_ddb, "upload_source_pdfs", lambda documents, bucket: 0)
+    seed_ddb.seed("p1", live_sept=True, docs_bucket="test-docs")
+    seed_ddb.seed("p1", live_sept=True, docs_bucket="test-docs")
+    for month in (7, 8, 9):
+        entries = _items("p1", f"LEDGER#2026-{month:02d}#")
+        assert sum(line["debit"] for line in entries if line["account"] == "6600") == 565_000
+    assert ddb.get_revenue_lines("p1", "2026-09") == []
