@@ -8,6 +8,8 @@ npm.cmd run dev
 
 Open http://localhost:3000. Mock mode is enabled by default. The role switcher is for demo sessions only. Copy `.env.example` to `.env.local`, set the API and Cognito values, and set `NEXT_PUBLIC_USE_MOCKS=false` to use AWS.
 
+For live deployment, use `.env.live.example` with the stack's `ApiUrl`, `UserPoolId` and `UserPoolClientId`. Disable both mock and local API flags. Apply the same values in Amplify's environment before building. Role E owns the Amplify Hosting repository connection (E2); Akshaya owns frontend configuration and deployed UI validation (A11). See `docs/handoffs/A-frontend.md`. The checked-in handoff still lists stack outputs as pending; the example does not imply that a live connection has been verified.
+
 ## D's local endpoints (no AWS)
 
 The dev server is already in main; switching to D's branch is unnecessary. Install its Python dependencies and start it from the repo root:
@@ -34,7 +36,7 @@ API response shapes are documented in [API.md](API.md). D's financials, reconcil
 
 P&L charts use selected-period totals. Balance sheet and cash flow tabs display account/activity arrays and totals. Reconciliation flags resolve source documents through `lineId`; missing payouts with no `docId` display a message. Export notifications show document/ledger counts and missing filenames. `lib/contracts.ts` also supports current main's subsequent switch to numeric statement totals, percentage points, and flag `reason` fields, while retaining the supplied canonical contract in mocks and UI types.
 
-Mock extraction and chat use sample fields and context. Uploads retain your file for preview. Invoice approval updates the demo financials. A W-9 and void check with filenames containing `northstar-w9` and `northstar-void-check` unblock the Northstar demo bill. Mock state resets on reload. Newly created demo rules are displayed; the sample workflow uses predefined rules. CSV import requires a live endpoint. The export is a ZIP of the demo library, scheduled-bill ledger entries and seeded financials; missing files are reported.
+Mock extraction and chat use sample fields and context. Uploads retain your file for preview. Invoice approval updates the demo financials. A W-9 and void check with filenames containing `brightline-w9` and `brightline-void-check` unblock the Brightline demo bill. Mock state resets on reload. Newly created demo rules are displayed; the sample workflow uses predefined rules. CSV import requires a live endpoint. The export is a ZIP of the demo library, scheduled-bill ledger entries and seeded financials; missing files are reported.
 
 Live requests use Cognito ID tokens per C's handoff. Remaining C integration work includes structured rule hits, `pending_docs`/`processing` statuses, confirm/receive actions and decision polling; see `docs/handoffs/A-frontend.md`. The frontend scaffolding and D contract integration are ready for review; the entire live workflow still needs this separate integration work and E's deployment.
 

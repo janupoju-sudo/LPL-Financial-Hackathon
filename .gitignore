@@ -4,6 +4,7 @@ node_modules/
 out/
 .env*
 !.env.example
+!.env.live.example
 *.tsbuildinfo
 .amplify/
 __pycache__/

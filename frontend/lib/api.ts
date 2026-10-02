@@ -84,7 +84,7 @@ export const api = {
     if (type === 'w9' || type === 'void_check') {
       const vendor = vendors.find(v => v.id === 'v2')!;
       if (type === 'w9') vendor.hasW9 = true; else vendor.hasVoidCheck = true;
-      doc.vendorName = vendor.name; doc.amount = 0; doc.extracted = { vendor: vendor.name, documentType: type, demo: 'Assigned to Northstar Studio for this demo' };
+      doc.vendorName = vendor.name; doc.amount = 0; doc.extracted = { vendor: vendor.name, documentType: type, demo: 'Assigned to Brightline Marketing for this demo' };
       if (vendor.hasW9 && vendor.hasVoidCheck) bills.filter(b => b.vendorId === vendor.id).forEach(b => { b.ruleHits = b.ruleHits.filter(hit => !hit.includes('missing')); });
     } else if (type !== 'payout_statement') {
       doc.billId = crypto.randomUUID();
