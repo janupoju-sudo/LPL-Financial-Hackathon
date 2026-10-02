@@ -22,9 +22,9 @@ class Export(unittest.TestCase):
         self.assertIn("ledger.csv", names)
         self.assertIn("financials.json", names)
         self.assertIn("README.txt", names)
-        self.assertIn("documents/invoice/Brightline_INV-2291.pdf", names)
+        self.assertIn("documents/invoice/Orion_INV-2291.pdf", names)
         self.assertIn("documents/payout_statement/LPL_Payout_Sep2026.pdf", names)
-        self.assertNotIn("documents/w9/Northgate_W9.pdf", names)  # June, not referenced in Q3
+        self.assertNotIn("documents/w9/Orion_W9.pdf", names)  # June, not referenced in Q3
         self.assertEqual(summary["missing"], [])
 
     def test_ledger_csv_balances(self):
@@ -43,8 +43,8 @@ class Export(unittest.TestCase):
                 raise FileNotFoundError(key)
             return b"x"
         z, summary = self.build(fetch)
-        self.assertEqual(summary["missing"], ["Brightline_INV-2291.pdf"])
-        self.assertIn("Could not include: Brightline_INV-2291.pdf", z.read("README.txt").decode())
+        self.assertEqual(summary["missing"], ["Orion_INV-2291.pdf"])
+        self.assertIn("Could not include: Orion_INV-2291.pdf", z.read("README.txt").decode())
 
 
 if __name__ == "__main__":

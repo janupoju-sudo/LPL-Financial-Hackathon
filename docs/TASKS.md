@@ -19,36 +19,36 @@ Dependencies are noted as `← B3` (wait on, or mock, that task).
 
 ## A — Frontend Lead
 **P0**
-- [ ] A1. Next.js + Tailwind + shadcn scaffold, layout with sidebar (Dashboard, Inbox, Bills, Revenue, Library, Ask, Rules)
-- [ ] A2. `lib/api.ts` typed client with `USE_MOCKS` flag reading `mocks/*.json`
-- [ ] A3. **Upload dropzone** → `POST /documents/upload-url` → PUT to S3 → poll document status ← C2
-- [ ] A4. **Document detail**: PDF preview beside extracted fields, confidence badges, "Recognized vendor ✓" chip
-- [ ] A5. **Bills / Approvals** table with status pills; rule-hit reasons; Approve/Reject buttons → `/bills/{id}/decision` ← C5
-- [ ] A6. **Dashboard**: KPI cards (Revenue, Margin, Recurring %, Est. Practice Value), P&L chart, balance sheet + cash flow tabs ← D2
-- [ ] A7. **Revenue reconciliation** view: expected vs. actual, red variance flags ← D4
-- [ ] A8. **Ask your books** chat with clickable citation chips that open the doc ← D5
-- [ ] A9. **Library**: search/filter by type, vendor, date; "Export package" button ← D6
-- [ ] A10. Cognito login (Amplify UI) + role switcher for demo (Owner ↔ Partner) ← E4
+- [A] A1. Next.js + Tailwind + shadcn scaffold, layout with sidebar (Dashboard, Inbox, Bills, Revenue, Library, Ask, Rules)
+- [A] A2. `lib/api.ts` typed client with `USE_MOCKS` flag reading `mocks/*.json`
+- [A] A3. **Upload dropzone** → `POST /documents/upload-url` → PUT to S3 → poll document status ← C2
+- [A] A4. **Document detail**: PDF preview beside extracted fields, confidence badges, "Recognized vendor ✓" chip
+- [A] A5. **Bills / Approvals** table with status pills; rule-hit reasons; Approve/Reject buttons → `/bills/{id}/decision` ← C5
+- [A] A6. **Dashboard**: KPI cards (Revenue, Margin, Recurring %, Est. Practice Value), P&L chart, balance sheet + cash flow tabs ← D2
+- [A] A7. **Revenue reconciliation** view: expected vs. actual, red variance flags ← D4
+- [A] A8. **Ask your books** chat with clickable citation chips that open the doc ← D5
+- [A] A9. **Library**: search/filter by type, vendor, date; "Export package" button ← D6
+- [A] A10. Cognito login (Amplify UI) + role switcher for demo (Owner ↔ Partner) ← E4
 - [ ] A11. Deploy to Amplify Hosting ← E2
 
 **P1**
-- [ ] A12. Rules page: view rules; create a rule with a simple form ← C7
-- [ ] A13. Loading skeletons, empty states, toast notifications, live refresh after approval
-- [ ] A14. Card transactions page (CSV import) ← C9
+- [A] A12. Rules page: view rules; create a rule with a simple form ← C7
+- [A] A13. Loading skeletons, empty states, toast notifications, live refresh after approval
+- [A] A14. Card transactions page (CSV import) ← C9
 
 ---
 
 ## B — Document AI
 **P0**
-- [ ] B1. `classify` Lambda: Bedrock prompt → `{type, confidence}` across 5 doc types
-- [ ] B2. `extract_expense` Lambda: Textract **AnalyzeExpense** → raw fields + line items
-- [ ] B3. `extract_tables` Lambda: Textract **AnalyzeDocument (TABLES, FORMS)** for payout statements, void checks, W-9s
-- [ ] B4. `normalize` Lambda: Bedrock maps Textract output → our JSON schema (strict JSON, validated) + confidence
-- [ ] B5. `match_vendor` Lambda: exact/alias → fuzzy match (e.g. `rapidfuzz`); set `defaultGlAccount` from history; create the vendor if new ← C3
-- [ ] B6. Step Functions `IngestDocument` ASL: classify → branch → normalize → match → create Bill / RevenueLines → start `ApproveBill` ← C4
+- [HM] B1. `classify` Lambda: Bedrock prompt → `{type, confidence}` across 5 doc types
+- [HM] B2. `extract_expense` Lambda: Textract **AnalyzeExpense** → raw fields + line items
+- [HM] B3. `extract_tables` Lambda: Textract **AnalyzeDocument (TABLES, FORMS)** for payout statements, void checks, W-9s
+- [HM] B4. `normalize` Lambda: Bedrock maps Textract output → our JSON schema (strict JSON, validated) + confidence
+- [HM] B5. `match_vendor` Lambda: exact/alias → fuzzy match (e.g. `rapidfuzz`); set `defaultGlAccount` from history; create the vendor if new ← C3
+- [HM] B6. Step Functions `IngestDocument` ASL: classify → branch → normalize → match → create Bill / RevenueLines → start `ApproveBill` ← C4
 - [ ] B7. EventBridge rule: S3 `Object Created` in `uploads/` → start `IngestDocument` ← E3
 - [ ] B8. Test on **all seed docs** (E5); tune prompts until every demo doc extracts correctly
-- [ ] B9. Void check / W-9 → update vendor `hasVoidCheck`, `hasW9`, `bankLast4`
+- [HM] B9. Void check / W-9 → update vendor `hasVoidCheck`, `hasW9`, `bankLast4`
 
 **P1**
 - [ ] B10. Duplicate/suspicious vendor flag (same bank details, different vendor name)

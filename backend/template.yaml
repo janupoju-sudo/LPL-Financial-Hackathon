@@ -201,128 +201,6 @@ Resources:
         CreateRule: { Type: HttpApi, Properties: { ApiId: !Ref HttpApi, Path: /rules, Method: POST } }
         UpdateRule: { Type: HttpApi, Properties: { ApiId: !Ref HttpApi, Path: "/rules/{id}", Method: PATCH } }
 
-  # ---------------------------------------------------------------- workflow
-  CreateBillFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      Handler: workflow.create_bill.handler
-      Environment:
-        Variables:
-          APPROVE_SM_ARN: !Ref ApproveBillStateMachine
-      Policies:
-        - DynamoDBCrudPolicy: { TableName: !Ref LedgerTable }
-        - StepFunctionsExecutionPolicy: { StateMachineName: !GetAtt ApproveBillStateMachine.Name }
-
-  EvaluateRulesFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      Handler: workflow.evaluate_rules.handler
-      Policies:
-        - DynamoDBCrudPolicy: { TableName: !Ref LedgerTable }
-
-  StoreTaskTokenFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      Handler: workflow.store_task_token.handler
-      Policies:
-        - DynamoDBCrudPolicy: { TableName: !Ref LedgerTable }
-        - EventBridgePutEventsPolicy: { EventBusName: !Ref AppEventBus }
-
-  PostLedgerFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      Handler: workflow.post_ledger.handler
-      Policies:
-        - DynamoDBCrudPolicy: { TableName: !Ref LedgerTable }
-
-  SchedulePaymentFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      Handler: workflow.schedule_payment.handler
-      Policies:
-        - DynamoDBCrudPolicy: { TableName: !Ref LedgerTable }
-
-  MarkRejectedFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      Handler: workflow.mark_rejected.handler
-      Policies:
-        - DynamoDBCrudPolicy: { TableName: !Ref LedgerTable }
-        - EventBridgePutEventsPolicy: { EventBusName: !Ref AppEventBus }
-
-  ResumeHeldBillsFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      Handler: workflow.resume_held_bills.handler
-      Policies:
-        - DynamoDBCrudPolicy: { TableName: !Ref LedgerTable }
-        - Statement:
-            - Effect: Allow
-              Action: [states:SendTaskSuccess]
-              Resource: "*"
-      Events:
-        VendorUpdated:
-          Type: EventBridgeRule
-          Properties:
-            EventBusName: !Ref AppEventBus
-            Pattern:
-              detail-type: [VendorUpdated]
-
-  LockDocumentFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      Handler: workflow.lock_document.handler
-      Policies:
-        - DynamoDBCrudPolicy: { TableName: !Ref LedgerTable }
-        - Statement:
-            - Effect: Allow
-              Action: [s3:PutObjectRetention, s3:GetObjectRetention]
-              Resource: !Sub ${DocsBucket.Arn}/uploads/*
-      Events:
-        DocumentUploaded:
-          Type: EventBridgeRule
-          Properties:
-            Pattern:
-              source: [aws.s3]
-              detail-type: [Object Created]
-              detail:
-                bucket:
-                  name: [!Ref DocsBucket]
-                object:
-                  key: [{ prefix: uploads/ }]
-
-  ApproveBillStateMachine:
-    Type: AWS::Serverless::StateMachine
-    Properties:
-      Name: !Sub ledgerline-approve-bill-${Stage}
-      Type: STANDARD
-      DefinitionUri: statemachines/approve_bill.asl.json
-      DefinitionSubstitutions:
-        EvaluateRulesFunctionArn: !GetAtt EvaluateRulesFunction.Arn
-        StoreTaskTokenFunctionArn: !GetAtt StoreTaskTokenFunction.Arn
-        PostLedgerFunctionArn: !GetAtt PostLedgerFunction.Arn
-        SchedulePaymentFunctionArn: !GetAtt SchedulePaymentFunction.Arn
-        MarkRejectedFunctionArn: !GetAtt MarkRejectedFunction.Arn
-        EventBusName: !Ref AppEventBus
-      Policies:
-        - LambdaInvokePolicy: { FunctionName: !Ref EvaluateRulesFunction }
-        - LambdaInvokePolicy: { FunctionName: !Ref StoreTaskTokenFunction }
-        - LambdaInvokePolicy: { FunctionName: !Ref PostLedgerFunction }
-        - LambdaInvokePolicy: { FunctionName: !Ref SchedulePaymentFunction }
-        - LambdaInvokePolicy: { FunctionName: !Ref MarkRejectedFunction }
-        - EventBridgePutEventsPolicy: { EventBusName: !Ref AppEventBus }
-
-
-# ----------------------------------------------------------------------------
-# Role D resources, inserted verbatim from backend/infra/d-resources.yaml.
-# If D changes that file, re-insert rather than hand-editing here.
-# ----------------------------------------------------------------------------
-# Role D resources, ready to paste under `Resources:` in backend/template.yaml.
-#
-# Uses the template's existing names: LedgerTable, DocsBucket, HttpApi.
-# CodeUri (src/), runtime, TABLE_NAME, DOCS_BUCKET and DEFAULT_PRACTICE_ID come from Globals.
-# src/requirements.txt adds the anthropic SDK (Ask calls Claude on Bedrock).
-
   # ---------------------------------------------------------------- D: financials
   # GET /financials (D2/D3/D7) and GET /revenue/reconciliation (D4)
   FinancialsFunction:
@@ -443,6 +321,116 @@ Resources:
       GuardrailIdentifier: !GetAtt AskGuardrail.GuardrailId
       Description: Demo version
 
+  # ---------------------------------------------------------------- workflow
+  CreateBillFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: workflow.create_bill.handler
+      Environment:
+        Variables:
+          APPROVE_SM_ARN: !Ref ApproveBillStateMachine
+      Policies:
+        - DynamoDBCrudPolicy: { TableName: !Ref LedgerTable }
+        - StepFunctionsExecutionPolicy: { StateMachineName: !GetAtt ApproveBillStateMachine.Name }
+
+  EvaluateRulesFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: workflow.evaluate_rules.handler
+      Policies:
+        - DynamoDBCrudPolicy: { TableName: !Ref LedgerTable }
+
+  StoreTaskTokenFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: workflow.store_task_token.handler
+      Policies:
+        - DynamoDBCrudPolicy: { TableName: !Ref LedgerTable }
+        - EventBridgePutEventsPolicy: { EventBusName: !Ref AppEventBus }
+
+  PostLedgerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: workflow.post_ledger.handler
+      Policies:
+        - DynamoDBCrudPolicy: { TableName: !Ref LedgerTable }
+
+  SchedulePaymentFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: workflow.schedule_payment.handler
+      Policies:
+        - DynamoDBCrudPolicy: { TableName: !Ref LedgerTable }
+
+  MarkRejectedFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: workflow.mark_rejected.handler
+      Policies:
+        - DynamoDBCrudPolicy: { TableName: !Ref LedgerTable }
+        - EventBridgePutEventsPolicy: { EventBusName: !Ref AppEventBus }
+
+  ResumeHeldBillsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: workflow.resume_held_bills.handler
+      Policies:
+        - DynamoDBCrudPolicy: { TableName: !Ref LedgerTable }
+        - Statement:
+            - Effect: Allow
+              Action: [states:SendTaskSuccess]
+              Resource: "*"
+      Events:
+        VendorUpdated:
+          Type: EventBridgeRule
+          Properties:
+            EventBusName: !Ref AppEventBus
+            Pattern:
+              detail-type: [VendorUpdated]
+
+  LockDocumentFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: workflow.lock_document.handler
+      Policies:
+        - DynamoDBCrudPolicy: { TableName: !Ref LedgerTable }
+        - Statement:
+            - Effect: Allow
+              Action: [s3:PutObjectRetention, s3:GetObjectRetention]
+              Resource: !Sub ${DocsBucket.Arn}/uploads/*
+      Events:
+        DocumentUploaded:
+          Type: EventBridgeRule
+          Properties:
+            Pattern:
+              source: [aws.s3]
+              detail-type: [Object Created]
+              detail:
+                bucket:
+                  name: [!Ref DocsBucket]
+                object:
+                  key: [{ prefix: uploads/ }]
+
+  ApproveBillStateMachine:
+    Type: AWS::Serverless::StateMachine
+    Properties:
+      Name: !Sub ledgerline-approve-bill-${Stage}
+      Type: STANDARD
+      DefinitionUri: statemachines/approve_bill.asl.json
+      DefinitionSubstitutions:
+        EvaluateRulesFunctionArn: !GetAtt EvaluateRulesFunction.Arn
+        StoreTaskTokenFunctionArn: !GetAtt StoreTaskTokenFunction.Arn
+        PostLedgerFunctionArn: !GetAtt PostLedgerFunction.Arn
+        SchedulePaymentFunctionArn: !GetAtt SchedulePaymentFunction.Arn
+        MarkRejectedFunctionArn: !GetAtt MarkRejectedFunction.Arn
+        EventBusName: !Ref AppEventBus
+      Policies:
+        - LambdaInvokePolicy: { FunctionName: !Ref EvaluateRulesFunction }
+        - LambdaInvokePolicy: { FunctionName: !Ref StoreTaskTokenFunction }
+        - LambdaInvokePolicy: { FunctionName: !Ref PostLedgerFunction }
+        - LambdaInvokePolicy: { FunctionName: !Ref SchedulePaymentFunction }
+        - LambdaInvokePolicy: { FunctionName: !Ref MarkRejectedFunction }
+        - EventBridgePutEventsPolicy: { EventBusName: !Ref AppEventBus }
 
 Outputs:
   ApiUrl:
@@ -460,11 +448,13 @@ Outputs:
     Value: !Ref AppEventBus
   ApproveBillStateMachineArn:
     Value: !Ref ApproveBillStateMachine
-  CreateBillFunctionArn:
-    Description: Invoke from the IngestDocument state machine (role B)
-    Value: !GetAtt CreateBillFunction.Arn
   AskGuardrailId:
-    Description: Guardrail protecting Ask your books (scripts/check_guardrail.py)
+    Description: For scripts/check_guardrail.py
     Value: !GetAtt AskGuardrail.GuardrailId
   AskGuardrailVersion:
     Value: !GetAtt AskGuardrailVersion.Version
+  ExportsBucketName:
+    Value: !Ref ExportsBucket
+  CreateBillFunctionArn:
+    Description: Invoke from the IngestDocument state machine (role B)
+    Value: !GetAtt CreateBillFunction.Arn
