@@ -5,8 +5,8 @@ import rulesFixture from '@/mocks/rules.json';
 import financialsFixture from '@/mocks/financials.json';
 import reconciliationFixture from '@/mocks/reconciliation.json';
 import askFixture from '@/mocks/ask.json';
-import type { Answer, Bill, Document, ExportResult, Financials, Reconciliation, Role, Rule, Vendor } from './types';
-import { normalizeBill, normalizeDocument, normalizeFinancials, normalizeReconciliation, normalizeRule, normalizeVendor, toApiRule, type ApiBill, type ApiDocument, type ApiRule, type ApiVendor, type LegacyFinancials } from './contracts';
+import type { Answer, Bill, BillDetail, BillReview, CardTransaction, Document, ExportResult, Financials, Reconciliation, Role, Rule, Vendor } from './types';
+import { normalizeBill, normalizeBillDetail, normalizeDocument, normalizeFinancials, normalizeReconciliation, normalizeRule, normalizeVendor, toApiRule, type ApiBill, type ApiDocument, type ApiRule, type ApiVendor, type LegacyFinancials } from './contracts';
 import { localDocuments } from './local-documents';
 import { validateLocalApi } from './local-mode';
 
@@ -42,6 +42,12 @@ export const api = {
   document: (id: string) => { if (!USE_MOCKS && !USE_LOCAL_API) return request<ApiDocument>(`/documents/${encodeURIComponent(id)}`).then(normalizeDocument); const doc = (USE_LOCAL_API ? localDocuments : documents).find(d => d.id === id); return doc ? Promise.resolve(clone(doc)) : Promise.reject(new Error(USE_LOCAL_API ? `Source ${id} is not available in D's local document metadata. The local server has no document-preview endpoint.` : 'Document not found')); },
   bills: () => USE_LOCAL_API ? Promise.resolve([] as Bill[]) : USE_MOCKS ? Promise.resolve(clone(bills)) : request<ApiBill[]>('/bills').then(list => list.map(normalizeBill)),
   vendors: () => USE_LOCAL_API ? Promise.resolve([] as Vendor[]) : USE_MOCKS ? Promise.resolve(clone(vendors)) : request<ApiVendor[]>('/vendors').then(list => list.map(normalizeVendor)),
+  bill: (id: string): Promise<BillDetail> => { if (!USE_MOCKS && !USE_LOCAL_API) return request<ApiBill>(`/bills/${encodeURIComponent(id)}`).then(normalizeBillDetail); const bill = bills.find(b => b.id === id); return bill ? Promise.resolve({ ...clone(bill), audit: [] }) : Promise.reject(new Error('Bill not found')); },
+  async confirmBill(id: string, review: BillReview) {
+    if (USE_MOCKS || USE_LOCAL_API) throw new Error('Reviewing bills needs the live backend.');
+    const result = await request<{ billId: string; status: string }>(`/bills/${encodeURIComponent(id)}/confirm`, review); changed(); return result;
+  },
+  transactions: (): Promise<CardTransaction[]> => USE_MOCKS || USE_LOCAL_API ? Promise.resolve([]) : request<CardTransaction[]>('/transactions'),
   rules: () => USE_LOCAL_API ? Promise.resolve([] as Rule[]) : USE_MOCKS ? Promise.resolve(clone(rules)) : request<ApiRule[]>('/rules').then(list => list.map(normalizeRule)),
   financials: (period: string) => MOCK_D ? Promise.resolve(mockFinancials()) : request<Financials | LegacyFinancials>(`/financials?period=${encodeURIComponent(period)}`).then(normalizeFinancials),
   reconciliation: (period: string) => MOCK_D ? Promise.resolve(clone(reconciliationFixture)) : request<Parameters<typeof normalizeReconciliation>[0]>(`/revenue/reconciliation?period=${encodeURIComponent(period)}`).then(normalizeReconciliation),
@@ -88,7 +94,7 @@ export const api = {
       if (vendor.hasW9 && vendor.hasVoidCheck) bills.filter(b => b.vendorId === vendor.id).forEach(b => { b.ruleHits = b.ruleHits.filter(hit => !hit.includes('missing')); });
     } else if (type !== 'payout_statement') {
       doc.billId = crypto.randomUUID();
-      bills.unshift({ id: doc.billId, docId: doc.id, vendorId: type === 'invoice' ? 'v1' : undefined, vendor: doc.vendorName, amount: doc.amount, dueDate: '2026-10-15', glAccount: String(doc.extracted.glAccount), status: doc.confidence < .8 ? 'pending_review' : 'pending_approval', ruleHits: [doc.confidence < .8 ? 'Extraction confidence below 80%; verify document fields' : 'Amount over $1,000 requires partner approval'] });
+      bills.unshift({ id: doc.billId, docId: doc.id, vendorId: type === 'invoice' ? 'v1' : undefined, vendor: doc.vendorName, amount: doc.amount, dueDate: '2026-10-15', glAccount: String(doc.extracted.glAccount), status: (doc.confidence ?? 1) < .8 ? 'pending_review' : 'pending_approval', ruleHits: [(doc.confidence ?? 1) < .8 ? 'Extraction confidence below 80%; verify document fields' : 'Amount over $1,000 requires partner approval'] });
     }
     documents.unshift(doc); changed(); return clone(doc);
   },
