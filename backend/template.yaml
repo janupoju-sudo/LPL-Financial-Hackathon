@@ -25,6 +25,15 @@ Parameters:
   BedrockModelId:
     Type: String
     Description: Exact Bedrock model ID approved and enabled for this hackathon account.
+  IngestModelId:
+    Type: String
+    Default: ""
+    Description: >
+      Model for ingest classify/normalize (boto3 Converse, which serves Opus 4.6 and earlier).
+      Use an inference profile ID such as us.anthropic.claude-sonnet-4-6. Empty = use BedrockModelId.
+
+Conditions:
+  HasIngestModelId: !Not [!Equals [!Ref IngestModelId, ""]]
 
 Globals:
   Function:
@@ -423,7 +432,7 @@ Resources:
       Timeout: 60
       Environment:
         Variables:
-          BEDROCK_MODEL_ID: !Ref BedrockModelId
+          BEDROCK_MODEL_ID: !If [HasIngestModelId, !Ref IngestModelId, !Ref BedrockModelId]
       Policies:
         - DynamoDBCrudPolicy: { TableName: !Ref LedgerTable }
         - S3ReadPolicy: { BucketName: !Ref DocsBucket }
@@ -457,7 +466,7 @@ Resources:
       Timeout: 60
       Environment:
         Variables:
-          BEDROCK_MODEL_ID: !Ref BedrockModelId
+          BEDROCK_MODEL_ID: !If [HasIngestModelId, !Ref IngestModelId, !Ref BedrockModelId]
       Policies:
         - S3ReadPolicy: { BucketName: !Ref DocsBucket }
         - Statement:
