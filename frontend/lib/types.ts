@@ -4,7 +4,7 @@ export type BillStatus = 'pending_review' | 'pending_approval' | 'approved' | 'r
 export interface Document { id: string; type: DocumentType; filename: string; status: string; vendorName: string; amount: number; createdAt: string; confidence: number; extracted: Record<string, string | number>; viewUrl: string; billId?: string; }
 export interface Bill { id: string; docId?: string; vendor: string; vendorId?: string; amount: number; dueDate: string; glAccount: string; status: BillStatus; ruleHits: string[]; }
 export interface Vendor { id: string; name: string; defaultGlAccount: string; hasW9: boolean; hasVoidCheck: boolean; billCount: number; }
-export interface Rule { id: string; name: string; condition: { field: string; op: string; value: string | number | boolean }; action: 'require_approval' | 'require_docs' | 'block'; approverRole: Role; }
+export interface Rule { id: string; name: string; condition: { field: string; op: string; value: string | number | boolean }; action: 'require_approval' | 'require_docs' | 'block'; approverRole?: Role; }
 export interface AccountLine { account: string | null; name: string; amount: number; }
 export interface Financials {
   period: string;
