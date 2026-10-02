@@ -225,6 +225,7 @@ Resources:
         - DynamoDBCrudPolicy: { TableName: !Ref LedgerTable }
       Events:
         ImportTransactions: { Type: HttpApi, Properties: { ApiId: !Ref HttpApi, Path: /transactions/import, Method: POST } }
+        ListTransactions: { Type: HttpApi, Properties: { ApiId: !Ref HttpApi, Path: /transactions, Method: GET } }
 
   # ---------------------------------------------------------------- D: financials
   # GET /financials (D2/D3/D7) and GET /revenue/reconciliation (D4)
