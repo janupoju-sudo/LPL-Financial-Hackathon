@@ -17,6 +17,10 @@ class Period(unittest.TestCase):
         self.assertEqual(context.pick_period("How much this year?", e, TODAY), "2026")
         self.assertEqual(context.pick_period("How are we doing?", e, TODAY), "2026-Q3")  # latest data
         self.assertEqual(context.pick_period("What's my margin?", e, TODAY), "2026-Q3")  # "mar" inside a word
+        self.assertEqual(context.pick_period("Biggest expenses last quarter?", e, TODAY), "2026-Q3")
+        self.assertEqual(context.pick_period("Revenue last month", e, TODAY), "2026-09")
+        self.assertEqual(context.pick_period("Revenue last year", e, TODAY), "2025")
+        self.assertEqual(context.pick_period("last quarter", e, date(2026, 2, 1)), "2025-Q4")
 
 
 class Context(unittest.TestCase):
@@ -74,3 +78,27 @@ class Ask(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ParseReply(unittest.TestCase):
+    """Bedrock's Opus 5 rejects output_config.format, so the JSON comes back as plain text."""
+
+    def setUp(self):
+        from ask.bedrock import parse_json_reply
+        self.parse = parse_json_reply
+
+    def test_clean_json(self):
+        r = self.parse('{"answer": "Rent rose.", "citations": ["d1"]}')
+        self.assertEqual(r, {"answer": "Rent rose.", "citations": ["d1"]})
+
+    def test_code_fence(self):
+        r = self.parse('```json\n{"answer": "Rent rose.", "citations": []}\n```')
+        self.assertEqual(r["answer"], "Rent rose.")
+
+    def test_json_inside_prose(self):
+        r = self.parse('Here you go:\n{"answer": "Margin fell.", "citations": ["d2", 7]}\nThanks')
+        self.assertEqual(r, {"answer": "Margin fell.", "citations": ["d2"]})
+
+    def test_not_json_keeps_text(self):
+        r = self.parse("Margin fell because rent went up.")
+        self.assertEqual(r, {"answer": "Margin fell because rent went up.", "citations": []})

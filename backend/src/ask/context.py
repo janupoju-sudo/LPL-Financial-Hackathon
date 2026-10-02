@@ -26,6 +26,15 @@ def pick_period(question: str, entries, today: date) -> str:
     year_m = re.search(r"\b(20\d\d)\b", q)
     year = int(year_m[1]) if year_m else None
 
+    if re.search(r"\b(last|previous|prior) quarter\b", q):
+        cur = (today.month - 1) // 3 + 1
+        return f"{today.year - 1}-Q4" if cur == 1 else f"{today.year}-Q{cur - 1}"
+    if re.search(r"\b(last|previous|prior) month\b", q):
+        return f"{today.year - 1}-12" if today.month == 1 else f"{today.year}-{today.month - 1:02d}"
+    if re.search(r"\b(last|previous|prior) year\b", q):
+        return str(today.year - 1)
+    if re.search(r"\bthis quarter\b", q):
+        return f"{today.year}-Q{(today.month - 1) // 3 + 1}"
     if m := re.search(r"\bq([1-4])\b", q):
         n = int(m[1])
         y = year or (today.year if 3 * n - 2 <= today.month else today.year - 1)
