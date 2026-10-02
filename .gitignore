@@ -6,3 +6,6 @@ out/
 !.env.example
 *.tsbuildinfo
 .amplify/
+__pycache__/
+*.pyc
+
