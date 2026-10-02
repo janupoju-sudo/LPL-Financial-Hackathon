@@ -1,0 +1,4 @@
+boto3
+pytest
+moto[dynamodb,events,s3,stepfunctions]>=5
+cfn-lint
