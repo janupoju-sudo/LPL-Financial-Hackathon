@@ -233,7 +233,8 @@ Resources:
         - DynamoDBReadPolicy: { TableName: !Ref LedgerTable }
         - Statement:
             - Effect: Allow
-              Action: [bedrock:InvokeModel, bedrock:InvokeModelWithResponseStream]
+              # AnthropicBedrockMantle (Messages API endpoint) authorizes as bedrock-mantle:CreateInference
+              Action: [bedrock-mantle:CreateInference, bedrock:InvokeModel, bedrock:InvokeModelWithResponseStream]
               Resource: "*"
             - Effect: Allow
               Action: bedrock:ApplyGuardrail
