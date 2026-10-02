@@ -1,4 +1,4 @@
-# Role D resources, ready to paste under `Resources:` in backend/template.yaml.
+# Role D resources (reference copy). Already merged into backend/template.yaml; edit that file, not this one.
 #
 # Uses the template's existing names: LedgerTable, DocsBucket, HttpApi.
 # CodeUri (src/), runtime, TABLE_NAME, DOCS_BUCKET and DEFAULT_PRACTICE_ID come from Globals.
@@ -26,7 +26,7 @@
       MemorySize: 512
       Environment:
         Variables:
-          ASK_MODEL_ID: anthropic.claude-opus-5-5
+          ASK_MODEL_ID: !Ref BedrockModelId   # template parameter; pass the approved model at deploy
           GUARDRAIL_ID: !GetAtt AskGuardrail.GuardrailId
           GUARDRAIL_VERSION: !GetAtt AskGuardrailVersion.Version
       Policies:
