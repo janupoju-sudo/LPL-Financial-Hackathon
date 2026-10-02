@@ -136,3 +136,11 @@ test('bill detail keeps the audit trail and payment from the live API', () => {
   assert.equal(detail.audit[0].actor, 'raj@harborpoint.example');
   assert.equal(detail.payment?.scheduledFor, '2026-07-25');
 });
+
+test('deleting a rule removes it from the list (mock mode)', async () => {
+  const before = await api.rules();
+  await api.deleteRule(before[0].id);
+  const after = await api.rules();
+  assert.equal(after.length, before.length - 1);
+  assert.ok(!after.some(r => r.id === before[0].id));
+});

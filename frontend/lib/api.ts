@@ -23,7 +23,7 @@ let rules = clone(rulesFixture) as Rule[];
 const listeners = new Set<() => void>();
 export function subscribe(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener); }; }
 function changed() { listeners.forEach(listener => listener()); }
-async function request<T>(path: string, body?: unknown): Promise<T> {
+async function request<T>(path: string, body?: unknown, method?: 'DELETE'): Promise<T> {
   if (!baseUrl) throw new Error('Set NEXT_PUBLIC_API_URL to connect to the backend.');
   const headers: Record<string, string> = body === undefined ? {} : { 'Content-Type': 'application/json' };
   if (USE_LOCAL_API) validateLocalApi(baseUrl);
@@ -33,7 +33,7 @@ async function request<T>(path: string, body?: unknown): Promise<T> {
     if (!token) throw new Error('Please sign in again.');
     headers.Authorization = `Bearer ${token}`;
   }
-  const response = await fetch(`${baseUrl}${path}`, { method: body === undefined ? 'GET' : 'POST', headers, body: body === undefined ? undefined : JSON.stringify(body) });
+  const response = await fetch(`${baseUrl}${path}`, { method: method ?? (body === undefined ? 'GET' : 'POST'), headers, body: body === undefined ? undefined : JSON.stringify(body) });
   if (!response.ok) throw new Error(`Request failed (${response.status}): ${(await response.text()).slice(0, 200)}`);
   return response.json() as Promise<T>;
 }
@@ -60,6 +60,11 @@ export const api = {
     if (role !== 'partner' && role !== 'owner') throw new Error('Switch to Owner or Partner to make a decision.');
     if (decision === 'approve' && bill.ruleHits.some(hit => hit.includes('missing'))) throw new Error('Upload the vendor W-9 and void check before approval.');
     bill.status = decision === 'approve' ? 'scheduled' : 'rejected'; changed(); return { id, status: bill.status };
+  },
+  async deleteRule(id: string) {
+    if (USE_LOCAL_API) throw new Error('D’s local server does not support rules.');
+    if (!USE_MOCKS) { await request<{ ruleId: string; deleted: boolean }>(`/rules/${encodeURIComponent(id)}`, undefined, 'DELETE'); changed(); return; }
+    rules = rules.filter(r => r.id !== id); changed();
   },
   async createRule(input: Omit<Rule, 'id'>) { if (USE_LOCAL_API) throw new Error('D’s local server does not support rules.'); if (!USE_MOCKS) { await request<ApiRule>('/rules', toApiRule(input)); changed(); return api.rules(); } rules.push({ ...input, id: crypto.randomUUID() }); changed(); return clone(rules); },
   async upload(file: File, onProgress: (status: string) => void, signal?: AbortSignal): Promise<Document> {
