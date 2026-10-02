@@ -11,7 +11,7 @@ Dependencies are noted as `← B3` (wait on, or mock, that task).
 - [ ] Shared AWS account/region (`us-east-1`), IAM users for all 5, **AWS Budgets alarm $25** — **E**
 - [ ] Enable **Bedrock model access** (Claude) and verify one `InvokeModel` call — **B**
 - [ ] Verify one **Textract AnalyzeExpense** call on a sample invoice — **B**
-- [ ] Agree on and commit the **API contract** + `frontend/mocks/*.json` — **C + A** (everyone reviews)
+- [x] Agree on and commit the **API contract** + `frontend/mocks/*.json` — **C + A** (everyone reviews)
 - [ ] **Submit category form: Startup We'd Buy Tomorrow + Biggest Business Impact** — **E**
 - [ ] Assign names to roles A–E in PLAN.md §7
 
@@ -61,21 +61,31 @@ Dependencies are noted as `← B3` (wait on, or mock, that task).
 
 ## C — Backend & Workflows
 **P0**
-- [ ] C1. DynamoDB single table + `shared/ddb.py` helpers + `shared/models.py` (PLAN.md §4)
-- [ ] C2. `POST /documents/upload-url`, `GET /documents`, `GET /documents/{id}`
-- [ ] C3. `GET /vendors`; vendor repository used by B5
-- [ ] C4. Bill creation helper (called from ingest) + `GET /bills?status=`
-- [ ] C5. `POST /bills/{id}/decision` → `SendTaskSuccess` / `SendTaskFailure`
-- [ ] C6. `evaluate_rules` Lambda: amount threshold, new-vendor-missing-docs, received-before-pay
-- [ ] C7. `GET/POST /rules` + 3 default rules seeded
-- [ ] C8. Step Functions `ApproveBill` ASL: evaluate → auto-approve OR `waitForTaskToken` → `post_ledger` → mark `scheduled` (mock pay) → EventBridge `LedgerUpdated`
-- [ ] C9. `shared/ledger.py`: double-entry posting (`Dr Expense / Cr AP`; mock pay `Dr AP / Cr Cash`; payout `Dr Cash / Cr Revenue`) ← pair with D
-- [ ] C10. API Gateway HTTP API + Cognito JWT authorizer + CORS ← E4
+- [x] C1. DynamoDB single table + `shared/ddb.py` helpers (+ `shared/repo.py` in place of `models.py`) (PLAN.md §4)
+- [x] C2. `POST /documents/upload-url`, `GET /documents`, `GET /documents/{id}`
+- [x] C3. `GET /vendors`; vendor repository used by B5
+- [x] C4. Bill creation helper (called from ingest) + `GET /bills?status=`
+- [x] C5. `POST /bills/{id}/decision` → resumes the task (reject → `MarkRejected`); role check, no self-approval, atomic
+- [x] C6. `evaluate_rules` Lambda: amount threshold, new-vendor-missing-docs, received-before-pay (+ duplicate invoice → block)
+- [x] C7. `GET/POST /rules` (+ `PATCH`) + 4 default rules seeded
+- [x] C8. Step Functions `ApproveBill` ASL: evaluate → auto-approve OR `waitForTaskToken` → `post_ledger` → mark `scheduled` (mock pay) → EventBridge `LedgerUpdated`
+- [x] C9. `shared/ledger.py`: double-entry posting (`Dr Expense / Cr AP`; mock pay `Dr AP / Cr Cash`; payout `Dr Cash / Cr Revenue`), per line in int cents, atomic + idempotent ← paired with D
+- [x] C10. API Gateway HTTP API + Cognito JWT authorizer + CORS ← E4
 
 **P1**
-- [ ] C11. `POST /transactions/import` (CSV) → ledger entries + categorization (Bedrock)
+- [x] C11. `POST /transactions/import` (CSV) → ledger entries + categorization (vendor memory + merchant keywords, not Bedrock) + receipt matching (#23)
 - [ ] C12. Gift/entertainment rule: flag card spend over a configurable limit
-- [ ] C13. Audit trail endpoint: who approved what and when
+- [J] C13. Audit trail: every bill's `audit[]` (who did what, when) via `GET /bills/{id}`; no separate endpoint yet
+
+**Also done (C)**
+- [x] C14. `POST /bills/{id}/confirm` (human review of low-confidence bills) + `POST /bills/{id}/receive`
+- [x] C15. Object Lock retention applied per upload (`LockDocumentFunction`)
+- [x] C16. Revenue lines + fee schedule helpers (`repo.put_revenue_lines`) for D's reconciliation
+- [x] C17. Hold-for-documents loop: W-9/void check arrival → `VendorUpdated` → held bills resume automatically
+- [x] C18. Template owner: wired D's resources (financials, ask, export, guardrail) and B's ingest; Ask IAM for Bedrock (#13); optional `IngestModelId` (#14)
+- [x] C19. Cognito self-signup disabled (#16)
+- [x] C20. Frontend live-mode adapter for C's API field names (#29)
+- [x] C21. `POST /documents/{id}/resolve`: close out Needs Review documents (#35)
 
 ---
 
