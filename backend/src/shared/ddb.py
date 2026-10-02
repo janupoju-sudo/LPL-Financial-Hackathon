@@ -93,13 +93,14 @@ def query_prefix(practice_id: str, prefix: str):
         kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
 
 
-def update_item(practice_id, sk, set_fields=None, remove=None, append=None, condition=None, extra_values=None):
+def update_item(practice_id, sk, set_fields=None, remove=None, append=None, condition=None, extra_values=None,
+                extra_names=None):
     """Build and run an UpdateExpression.
 
     set_fields: {attr: value} to SET
     remove:     [attr, ...] to REMOVE
     append:     {attr: [items]} appended to a list attribute (created if missing)
-    condition:  ConditionExpression using #names from the fields above or :values in extra_values
+    condition:  ConditionExpression using #names from the fields above or extra_names, :values in extra_values
     """
     set_fields, remove, append = set_fields or {}, remove or [], append or {}
     names, values, sets = {}, {}, []
@@ -123,6 +124,8 @@ def update_item(practice_id, sk, set_fields=None, remove=None, append=None, cond
         expr.append("REMOVE " + ", ".join(rem))
     if extra_values:
         values.update(to_ddb(extra_values))
+    if extra_names:
+        names.update(extra_names)
     kwargs = {
         "Key": {"PK": pk(practice_id), "SK": sk},
         "UpdateExpression": " ".join(expr),
