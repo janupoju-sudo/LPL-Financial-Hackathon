@@ -74,6 +74,7 @@ Controls: no self-approval (uploader ≠ approver), one decision per task token 
 | POST | `/documents/upload-url` | `{filename, contentType}` (pdf/png/jpeg/tiff) | `{documentId, uploadUrl, s3Key, requiredHeaders}`: PUT the file to `uploadUrl` **with the same Content-Type** |
 | GET | `/documents` | `?type=&q=` | `[{documentId, type, filename, status, vendorName, amount, billId, locked, createdAt}]` |
 | GET | `/documents/{id}` | | full doc + `viewUrl` (presigned, 15 min) |
+| POST | `/documents/{id}/resolve` | `{resolution: "dismiss" \| "accept", note?}` | closes a `needs_review` document: `dismiss` → `dismissed` (not a financial record; file stays in the library), `accept` → `processed`; records `review` + audit. 409 if not `needs_review`, already resolved, or it has a bill (use `/bills/{id}/confirm`). owner, ops, lpl_bookkeeper |
 | GET | `/vendors` | | `[{vendorId, name, defaultGlAccount, hasW9, hasVoidCheck, bankLast4, billCount}]` |
 | GET | `/bills` | `?status=pending_approval,pending_docs` | bill summaries (newest first) |
 | GET | `/bills/{id}` | | full bill incl. `ruleHits`, `requiredApprovers`, `payment`, `audit[]` |

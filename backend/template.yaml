@@ -173,6 +173,7 @@ Resources:
         UploadUrl: { Type: HttpApi, Properties: { ApiId: !Ref HttpApi, Path: /documents/upload-url, Method: POST } }
         ListDocuments: { Type: HttpApi, Properties: { ApiId: !Ref HttpApi, Path: /documents, Method: GET } }
         GetDocument: { Type: HttpApi, Properties: { ApiId: !Ref HttpApi, Path: "/documents/{id}", Method: GET } }
+        ResolveDocument: { Type: HttpApi, Properties: { ApiId: !Ref HttpApi, Path: "/documents/{id}/resolve", Method: POST } }
 
   VendorsFunction:
     Type: AWS::Serverless::Function
