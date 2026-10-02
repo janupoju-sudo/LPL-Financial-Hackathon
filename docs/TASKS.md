@@ -35,6 +35,7 @@ Dependencies are noted as `← B3` (wait on, or mock, that task).
 - [A] A12. Rules page: view rules; create a rule with a simple form ← C7
 - [A] A13. Loading skeletons, empty states, toast notifications, live refresh after approval
 - [A] A14. Card transactions page (CSV import) ← C9
+- [A] A15. Profile settings panel with persistent dark mode toggle
 
 ---
 
