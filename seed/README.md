@@ -16,25 +16,24 @@ manifest records stable document IDs and planned S3 keys for the lease amendment
 July-September compliance invoices, and September 2025-August 2026 payout
 statements.
 
-The PDFs are local only. Their manifest upload status is `pending`, and the seeded
-DynamoDB document records use `status=pending_upload`. No S3 objects or working
-download links exist until the team uploads these files. Supporting source PDFs
-and the fallback payout attachment use `seed-sources/<practiceId>/<documentId>/<filename>`
-so they cannot trigger ingestion. Upload these files directly to that exact key;
-do not request `/documents/upload-url`, which always creates an ingesting
-`uploads/` key. The seven workflow documents stay on the normal `uploads/` path.
+Supporting source PDFs and the fallback payout attachment use
+`seed-sources/<practiceId>/<documentId>/<filename>`, outside the ingest trigger.
+The seven live workflow documents retain their normal `uploads/` paths.
 
-Example upload after the team confirms the target bucket and practice:
+The seed owner uploads supporting PDFs with the uploader merged in PR #27:
 
 ```bash
-aws s3 cp seed/docs/sources/lease_amendment_effective_2026-07-01.pdf \
-	s3://<DocsBucketName>/seed-sources/p1/doc_lease_amendment_2026_07/lease_amendment_effective_2026-07-01.pdf
+cd backend
+python scripts/seed_ddb.py --table ledgerline-dev --practice p1 --live-sept --docs-bucket <DocsBucketName>
 ```
 
-Use the matching `s3_key_template` in `seed/docs/manifest.json` for each file.
-The fallback payout attachment has its own `seed-sources/` mapping; the same
-September payout PDF in the seven-document live workflow set has an `uploads/`
-mapping instead.
+Use this only after the live-table compliance migration described in the backend
+README. The uploader checks existing objects, uploads missing PDFs and marks
+matching DOC records `processed`. Without a documents bucket, files remain local
+and the source records are `pending_upload`. A raw `aws s3 cp` does not perform
+those metadata updates. The seed owner coordinates this live operation; Advika
+must not run a competing seed or upload. Object Lock retention for seeded source
+keys must be verified by the upload/deployment owner before claiming protection.
 
 ## B8 checklist
 
