@@ -138,9 +138,13 @@ DEFAULT_RULES = [
     {
         "ruleId": "rule_vendor_docs", "name": "Vendor must have W-9 and void check on file",
         "enabled": True, "priority": 20,
-        "condition": {"any": [
-            {"field": "vendor.hasW9", "op": "neq", "value": True},
-            {"field": "vendor.hasVoidCheck", "op": "neq", "value": True},
+        # Receipts are already paid (card/cash): vendor onboarding docs only apply to bills we pay.
+        "condition": {"all": [
+            {"field": "bill.documentType", "op": "neq", "value": "receipt"},
+            {"any": [
+                {"field": "vendor.hasW9", "op": "neq", "value": True},
+                {"field": "vendor.hasVoidCheck", "op": "neq", "value": True},
+            ]},
         ]},
         "action": "hold", "reason": "Vendor is missing a W-9 or void check",
     },

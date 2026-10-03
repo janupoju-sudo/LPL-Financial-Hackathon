@@ -48,6 +48,7 @@ def handler(event, context=None):
     bill = {
         "billId": bill_id,
         "documentId": document_id,
+        "documentType": event.get("documentType") or doc.get("type"),   # invoice | receipt (set by classify)
         "vendorId": vendor_id,
         "vendorName": vendor["name"] if vendor else event.get("vendorName"),
         "amount": amount,
