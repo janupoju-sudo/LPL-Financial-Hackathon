@@ -65,7 +65,7 @@ export function BusinessStep({ answers, update }: StepProps) {
             </motion.button>
           ); })}
         </div>
-        <small>Otter checks each LPL payout statement against what these should have paid.</small>
+        <small>Otter checks each payout statement against what these should have paid.</small>
       </Item>
     </motion.div>
   );
