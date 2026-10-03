@@ -10,8 +10,10 @@ const PRESSABLE = [
   '.settings-signout', '.theme-switch', '.profile-trigger', '.segmented button', '.tabs button', '.documents-summary button',
 ].join(', ');
 
-// App cards that fade up as they scroll into view.
-const REVEAL = '.content .panel, .content .kpi, .content .insight-card, .content .rule-card, .content .stat-card';
+// App cards rise and fade in as they scroll into view; rows and list items inside them follow, smaller.
+const REVEAL_CARDS = '.content .panel, .content .kpi, .content .insight-card';
+const REVEAL_ROWS = '.content tbody tr, .content .statement-row, .content .attention-item, .content .suggestions > *';
+const REVEAL = `${REVEAL_CARDS}, ${REVEAL_ROWS}`;
 
 const reduced = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const pressIn = { type: 'spring', stiffness: 700, damping: 32 } as const;
@@ -59,9 +61,11 @@ export function RevealOnScroll({ path }: { path: string }) {
         el.style.opacity = '0';
         stops.push(inView(el, () => {
           // Cards that appear together are staggered slightly, top to bottom.
-          const delay = Math.min(batch++, 6) * 0.05;
+          const row = !el.matches(REVEAL_CARDS);
+          const delay = Math.min(batch++, 10) * (row ? 0.035 : 0.07);
           cancelAnimationFrame(frame); frame = requestAnimationFrame(() => { batch = 0; });
-          animate(el, { opacity: [0, 1], y: [18, 0] }, { duration: 0.55, delay, ease: [0.22, 1, 0.36, 1] });
+          animate(el, row ? { opacity: [0, 1], y: [14, 0] } : { opacity: [0, 1], y: [32, 0], scale: [0.98, 1] },
+            { duration: row ? 0.45 : 0.7, delay, ease: [0.22, 1, 0.36, 1] });
         }, { margin: '0px 0px -40px 0px' }));
       });
     };
