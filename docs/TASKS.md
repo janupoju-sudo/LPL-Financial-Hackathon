@@ -11,7 +11,7 @@ Dependencies are noted as `← B3` (wait on, or mock, that task).
 - [ ] Shared AWS account/region (`us-east-1`), IAM users for all 5, **AWS Budgets alarm $25** — **E**
 - [ ] Enable **Bedrock model access** (Claude) and verify one `InvokeModel` call — **B**
 - [ ] Verify one **Textract AnalyzeExpense** call on a sample invoice — **B**
-- [ ] Agree on and commit the **API contract** + `frontend/mocks/*.json` — **C + A** (everyone reviews)
+- [x] Agree on and commit the **API contract** + `frontend/mocks/*.json` — **C + A** (everyone reviews)
 - [ ] **Submit category form: Startup We'd Buy Tomorrow + Biggest Business Impact** — **E**
 - [ ] Assign names to roles A–E in PLAN.md §7
 
@@ -19,24 +19,29 @@ Dependencies are noted as `← B3` (wait on, or mock, that task).
 
 ## A — Frontend Lead
 **P0**
-- [A] A1. Next.js + Tailwind + shadcn scaffold, layout with sidebar (Dashboard, Inbox, Bills, Revenue, Library, Ask, Rules)
-- [A] A2. `lib/api.ts` typed client with `USE_MOCKS` flag reading `mocks/*.json`
-- [A] A3. **Upload dropzone** → `POST /documents/upload-url` → PUT to S3 → poll document status ← C2
-- [A] A4. **Document detail**: PDF preview beside extracted fields, confidence badges, "Recognized vendor ✓" chip
-- [A] A5. **Bills / Approvals** table with status pills; rule-hit reasons; Approve/Reject buttons → `/bills/{id}/decision` ← C5
-- [A] A6. **Dashboard**: KPI cards (Revenue, Margin, Recurring %, Est. Practice Value), P&L chart, balance sheet + cash flow tabs ← D2
-- [A] A7. **Revenue reconciliation** view: expected vs. actual, red variance flags ← D4
-- [A] A8. **Ask your books** chat with clickable citation chips that open the doc ← D5
-- [A] A9. **Library**: search/filter by type, vendor, date; "Export package" button ← D6
-- [A] A10. Cognito login (Amplify UI) + role switcher for demo (Owner ↔ Partner) ← E4
+- [x] A1. Next.js + Tailwind + shadcn scaffold, layout with sidebar (Dashboard, Inbox, Bills, Revenue, Library, Ask, Rules)
+- [x] A2. `lib/api.ts` typed client with `USE_MOCKS` flag reading `mocks/*.json`
+- [x] A3. **Upload dropzone** → `POST /documents/upload-url` → PUT to S3 → poll document status ← C2
+- [x] A4. **Document detail**: PDF preview beside extracted fields, confidence badges, "Recognized vendor ✓" chip
+- [x] A5. **Bills / Approvals** table with status pills; rule-hit reasons; Approve/Reject buttons → `/bills/{id}/decision` ← C5
+- [x] A6. **Dashboard**: KPI cards (Revenue, Margin, Recurring %, Est. Practice Value), P&L chart, balance sheet + cash flow tabs ← D2
+- [x] A7. **Revenue reconciliation** view: expected vs. actual, red variance flags ← D4
+- [x] A8. **Ask your books** chat with clickable citation chips that open the doc ← D5
+- [x] A9. **Library**: search/filter by type, vendor, date; "Export package" button ← D6
+- [x] A10. Cognito login (Amplify UI) + role switcher for demo (Owner ↔ Partner) ← E4
 - [ ] A11. Deploy to Amplify Hosting ← E2
 
 **P1**
-- [A] A12. Rules page: view rules; create a rule with a simple form ← C7
-- [A] A13. Loading skeletons, empty states, toast notifications, live refresh after approval
-- [A] A14. Card transactions page (CSV import) ← C9
-- [A] A15. Profile settings panel with persistent dark mode toggle
-- [AK] A16. Align Brightline demo vendor and switch frontend to deployed stack outputs
+- [x] A12. Rules page: view rules; create a rule with a simple form ← C7
+- [x] A13. Loading skeletons, empty states, toast notifications, live refresh after approval
+- [x] A14. Card transactions page (CSV import) ← C9
+- [x] A15. Profile settings panel with persistent dark mode toggle
+- [x] A16. Align Brightline demo vendor and switch frontend to deployed stack outputs
+- [AK] A17. Combine Inbox and Library into Documents: Upload action, All documents / Needs review / Vendors views, summary counts, search and filters (implemented on `frontend`; awaiting merge to `main`)
+- [AK] A18. Remove header LIVE badge, role control, bell shortcut, and sidebar connection/authentication text (implemented on `frontend`; awaiting merge to `main`)
+
+**A status audit (2026-10-02, Akshaya):** A1-A10 and A12-A16 are implemented and merged into `main`; checkmarks indicate frontend implementation completion, not verification of every live workflow. Live Cognito sign-in, document views, and responsive navigation have been browser-checked. End-to-end upload/approval and CSV import still need full live validation. A11 remains open until E confirms Amplify Hosting deployment and its URL. The Documents consolidation and header cleanup are complete on `frontend` but are not yet marked `[x]` because they have not merged into `main`. The header role control was subsequently removed at Akshaya's request; Cognito group-based roles remain.
+
 
 ---
 
