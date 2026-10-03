@@ -72,7 +72,7 @@ def list_docs(event):
     caller = get_caller(event)
     docs = repo.list_documents(caller.practice_id, query_param(event, "type"), query_param(event, "q"))
     keys = ("documentId", "type", "filename", "status", "vendorId", "vendorName", "amount",
-            "billId", "confidence", "createdAt", "locked")
+            "billId", "confidence", "createdAt", "locked", "review")
     return 200, [{k: d.get(k) for k in keys if k in d} for d in map(public, docs)]
 
 
