@@ -55,11 +55,11 @@ export function normalizeBill(bill: ApiBill): Bill {
     ...(bill.invoiceNumber ? { invoiceNumber: bill.invoiceNumber } : {}),
     ...(bill.requiredApprovers ? { requiredApprovers: bill.requiredApprovers } : {}),
     ...(bill.createdAt ? { createdAt: bill.createdAt } : {}),
+    ...(bill.createdBy ? { createdBy: bill.createdBy } : {}),
   };
 }
 export const normalizeBillDetail = (bill: ApiBill): BillDetail => ({
   ...normalizeBill(bill), audit: bill.audit ?? [], payment: bill.payment, rejectionReason: bill.rejectionReason, invoiceDate: bill.invoiceDate,
-  ...(bill.createdBy ? { createdBy: bill.createdBy } : {}),
 });
 export const normalizeVendor = ({ vendorId, ...vendor }: ApiVendor): Vendor => ({ ...vendor, id: vendor.id ?? vendorId });
 export const normalizeRule = ({ ruleId, action, ...rule }: ApiRule): Rule => ({ ...rule, id: rule.id ?? ruleId, action: action === 'hold' ? 'require_docs' : action });
