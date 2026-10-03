@@ -1,8 +1,8 @@
 export type Role = 'owner' | 'partner' | 'ops' | 'lpl_bookkeeper';
-export type DocumentType = 'invoice' | 'receipt' | 'void_check' | 'w9' | 'payout_statement';
-export type BillStatus = 'pending_review' | 'processing' | 'pending_approval' | 'pending_docs' | 'approved' | 'rejected' | 'scheduled';
-export interface Document { id: string; type: DocumentType; filename: string; status: string; vendorName: string; amount: number; createdAt: string; confidence?: number | null; extracted: Record<string, string | number>; viewUrl: string; billId?: string; review?: { resolution: 'accept' | 'dismiss'; by: string; at: string; note?: string | null }; }
-export interface Bill { id: string; docId?: string; vendor: string; vendorId?: string; amount: number; dueDate: string; glAccount: string; glAccountReason?: string; status: BillStatus; ruleHits: string[]; invoiceNumber?: string; requiredApprovers?: string[]; createdAt?: string; createdBy?: string; }
+export type DocumentType = 'invoice' | 'receipt' | 'void_check' | 'w9' | 'payout_statement' | 'unknown';
+export type BillStatus = 'pending_review' | 'processing' | 'scheduling' | 'pending_approval' | 'pending_docs' | 'approved' | 'rejected' | 'scheduled' | 'voiding' | 'voided' | 'withdrawn';
+export interface Document { id: string; type: DocumentType; filename: string; status: string; vendorName: string; amount: number; createdAt: string; confidence?: number | null; extracted: Record<string, string | number>; viewUrl: string; billId?: string; uploadedBy?: string; review?: { resolution: 'accept' | 'dismiss'; by: string; at: string; note?: string | null }; }
+export interface Bill { id: string; docId?: string; vendor: string; vendorId?: string; amount: number; dueDate: string; glAccount: string; glAccountReason?: string; status: BillStatus; ruleHits: string[]; invoiceNumber?: string; requiredApprovers?: string[]; createdBy?: string; createdAt?: string; }
 export interface AuditEvent { at: string; actor: string; action: string; detail?: string; }
 export interface BillDetail extends Bill { audit: AuditEvent[]; payment?: { method?: string; scheduledFor?: string; confirmation?: string; bankLast4?: string | null }; rejectionReason?: string; invoiceDate?: string; }
 export interface BillReview { amount?: number; vendorName?: string; glAccount?: string; dueDate?: string; invoiceNumber?: string; }

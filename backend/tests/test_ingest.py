@@ -1,5 +1,7 @@
+import json
 import unittest
 from decimal import Decimal
+from pathlib import Path
 from types import ModuleType
 from unittest.mock import Mock, patch
 
@@ -67,6 +69,19 @@ class IngestValidationTests(unittest.TestCase):
     def test_rejects_non_upload_key(self) -> None:
         with self.assertRaisesRegex(ValueError, "uploads/<practiceId>"):
             upload_context({"bucket": "docs", "key": "other/p1/doc/file.pdf"})
+
+    def test_only_invoices_enter_bill_creation_workflow(self) -> None:
+        definition_path = (
+            Path(__file__).parents[1] / "statemachines" / "ingest_document.asl.json"
+        )
+        definition = json.loads(definition_path.read_text())
+        route = definition["States"]["RouteDocument"]
+
+        self.assertEqual(
+            [(choice["StringEquals"], choice["Next"]) for choice in route["Choices"]],
+            [("invoice", "PrepareBill")],
+        )
+        self.assertEqual(route["Default"], "FinalizeDocument")
 
     def test_validates_classifier_output(self) -> None:
         self.assertEqual(
@@ -272,6 +287,79 @@ class IngestValidationTests(unittest.TestCase):
         fallback = prepare_bill(event)
         self.assertEqual(fallback["glAccount"], "6900")
         self.assertIn("default expense account", fallback["glAccountReason"])
+
+    def test_receipt_is_processed_and_linked_without_creating_a_bill(self) -> None:
+        repo = Mock()
+        ledger = Mock()
+        ledger.match_card_receipt.return_value = "txn-1"
+        config = ModuleType("config")
+        config.REVIEW_CONFIDENCE_THRESHOLD = 0.8
+        shared = ModuleType("shared")
+        shared.config = config
+        shared.ledger = ledger
+        shared.repo = repo
+        event = {
+            "classification": {
+                "data": {
+                    "bucket": "docs",
+                    "key": "uploads/p1/d1/receipt.pdf",
+                    "practiceId": "p1",
+                    "documentId": "d1",
+                    "filename": "receipt.pdf",
+                }
+            },
+            "normalization": {
+                "data": {
+                    "normalized": {
+                        "type": "receipt",
+                        "confidence": 0.97,
+                        "amount": 37.18,
+                        "invoiceDate": "2026-09-22",
+                    }
+                }
+            },
+        }
+
+        with patch.dict("sys.modules", {"shared": shared}):
+            result = route_handler(event)
+
+        self.assertEqual(result, {"status": "processed", "cardTxnId": "txn-1"})
+        ledger.match_card_receipt.assert_called_once_with("p1", "d1", 37.18, "2026-09-22")
+        self.assertEqual(repo.update_document.call_args.args[:2], ("p1", "d1"))
+        self.assertEqual(repo.update_document.call_args.kwargs["status"], "processed")
+        self.assertEqual(repo.update_document.call_args.kwargs["cardTxnId"], "txn-1")
+
+    def test_low_confidence_receipt_is_sent_to_review(self) -> None:
+        repo = Mock()
+        ledger = Mock()
+        config = ModuleType("config")
+        config.REVIEW_CONFIDENCE_THRESHOLD = 0.8
+        shared = ModuleType("shared")
+        shared.config = config
+        shared.ledger = ledger
+        shared.repo = repo
+        event = {
+            "classification": {
+                "data": {
+                    "bucket": "docs",
+                    "key": "uploads/p1/d1/receipt.pdf",
+                    "practiceId": "p1",
+                    "documentId": "d1",
+                    "filename": "receipt.pdf",
+                }
+            },
+            "normalization": {
+                "data": {"normalized": {"type": "receipt", "confidence": 0.79}}
+            },
+        }
+
+        with patch.dict("sys.modules", {"shared": shared}):
+            result = route_handler(event)
+
+        self.assertEqual(result["status"], "needs_review")
+        ledger.match_card_receipt.assert_not_called()
+        self.assertEqual(repo.update_document.call_args.kwargs["status"], "needs_review")
+
     def test_payout_is_saved_for_reconciliation_and_posted_to_ledger(self) -> None:
         repo = Mock()
         ledger = Mock()

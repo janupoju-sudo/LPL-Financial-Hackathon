@@ -11,9 +11,9 @@ from datetime import date
 
 from botocore.exceptions import ClientError
 
-from shared import coa, config, repo, workflow
+from shared import coa, config, ledger, repo, workflow
 from shared.auth import get_caller, require_role
-from shared.ddb import money, public
+from shared.ddb import money, public, today_iso
 from shared.http import HttpError, parse_body, path_param, query_param, router
 
 
@@ -141,6 +141,8 @@ def confirm(event):
     bill = _load(caller, path_param(event, "id"))
     if bill.get("status") != "pending_review":
         raise HttpError(409, f"Only bills in pending_review can be confirmed (status: {bill.get('status')})")
+    if bill.get("createdBy") == caller.sub:
+        raise HttpError(403, "A different owner or operations user must review the uploader's bill")
     body = parse_body(event)
     fields = {}
 
@@ -198,10 +200,148 @@ def receive(event):
     return 200, {"billId": bill["billId"], "status": bill.get("status"), "received": True}
 
 
+def _can_withdraw(caller, bill):
+    return caller.has_any("owner") or (
+        caller.has_any("ops") and bill.get("createdBy") == caller.sub
+    )
+
+
+def withdraw(event):
+    caller = get_caller(event)
+    bill = _load(caller, path_param(event, "id"))
+    if not _can_withdraw(caller, bill):
+        raise HttpError(403, "Only the uploader or an owner can withdraw this unposted bill")
+
+    status = bill.get("status")
+    if status not in {"pending_review", "pending_approval", "pending_docs"}:
+        raise HttpError(409, f"Only unposted bills can be withdrawn (status: {status})")
+    comment = (parse_body(event).get("reason") or "").strip()[:500]
+    if not comment:
+        raise HttpError(400, "A withdrawal reason is required")
+
+    if status == "pending_review":
+        repo.update_bill(
+            caller.practice_id,
+            bill["billId"],
+            set_fields={
+                "status": "withdrawn",
+                "withdrawalReason": f"Withdrawn by {caller.label}: {comment}",
+                "withdrawnAt": repo.now_iso(),
+            },
+            audit=repo.audit_event(caller.label, "withdrawn", comment),
+            condition="#s0 = :pending_review",
+            extra_values={":pending_review": "pending_review"},
+        )
+        if bill.get("documentId"):
+            repo.update_document(
+                caller.practice_id,
+                bill["documentId"],
+                status="withdrawn",
+                audit=repo.audit_event(caller.label, "withdrawn", comment),
+            )
+        return 200, {"billId": bill["billId"], "status": "withdrawn"}
+
+    token = _claim_task(
+        caller,
+        bill,
+        "processing",
+        repo.audit_event(caller.label, "withdrawal_requested", comment),
+    )
+    _resume_or_restore(caller, bill, token, {
+        "decision": "withdraw",
+        "approver": caller.label,
+        "approverSub": caller.sub,
+        "comment": comment,
+    })
+    return 200, {"billId": bill["billId"], "status": "processing"}
+
+
+def void_bill(event):
+    caller = get_caller(event)
+    require_role(caller, "owner")
+    bill = _load(caller, path_param(event, "id"))
+    reason = (parse_body(event).get("reason") or "").strip()[:500]
+    if not reason:
+        raise HttpError(400, "A void reason is required")
+
+    status = bill.get("status")
+    if status == "voiding":
+        previous_status = bill.get("voidFromStatus")
+    elif status in {"approved", "scheduled"}:
+        previous_status = status
+        if status == "scheduled" and bill.get("payment", {}).get("method") != "ACH (mock)":
+            raise HttpError(409, "Only simulated ACH payments can be voided here")
+        try:
+            repo.update_bill(
+                caller.practice_id,
+                bill["billId"],
+                set_fields={"status": "voiding", "voidFromStatus": previous_status},
+                audit=repo.audit_event(caller.label, "void_requested", reason),
+                condition="#s0 = :current_status",
+                extra_values={":current_status": status},
+            )
+        except ClientError as err:
+            if err.response.get("Error", {}).get("Code") == "ConditionalCheckFailedException":
+                raise HttpError(409, "Bill status changed; refresh and try again")
+            raise
+    else:
+        raise HttpError(409, f"Only approved or scheduled bills can be voided (status: {status})")
+
+    if previous_status not in {"approved", "scheduled"}:
+        raise HttpError(409, "Bill has no valid posted state to reverse")
+    if not bill.get("accrualJournalId"):
+        raise HttpError(409, "Bill has no recorded accrual journal to reverse")
+    if previous_status == "scheduled" and not bill.get("paymentJournalId"):
+        raise HttpError(409, "Bill has no recorded payment journal to reverse")
+
+    entry_date = today_iso()
+    ledger.post_journal(
+        caller.practice_id,
+        f"j-{bill['billId']}-void-accrual",
+        entry_date,
+        ledger.bill_accrual_reversal_lines(bill["amount"], bill["glAccount"]),
+        memo=f"Void accrual for {bill.get('vendorName', 'vendor')} {bill.get('invoiceNumber') or ''}".strip(),
+        source_doc_id=bill.get("documentId"),
+        source_type="bill_void",
+        source_id=bill["billId"],
+    )
+    if previous_status == "scheduled":
+        ledger.post_journal(
+            caller.practice_id,
+            f"j-{bill['billId']}-void-payment",
+            entry_date,
+            ledger.bill_payment_reversal_lines(bill["amount"]),
+            memo=f"Void mock payment to {bill.get('vendorName', 'vendor')}",
+            source_doc_id=bill.get("documentId"),
+            source_type="bill_void",
+            source_id=bill["billId"],
+        )
+
+    repo.update_bill(
+        caller.practice_id,
+        bill["billId"],
+        set_fields={
+            "status": "voided",
+            "voidReason": reason,
+            "voidedAt": repo.now_iso(),
+            "voidJournalIds": [
+                f"j-{bill['billId']}-void-accrual",
+                *([f"j-{bill['billId']}-void-payment"] if previous_status == "scheduled" else []),
+            ],
+        },
+        audit=repo.audit_event(caller.label, "voided", reason),
+        condition="#s0 = :voiding",
+        extra_values={":voiding": "voiding"},
+    )
+    return 200, {"billId": bill["billId"], "status": "voided"}
+
+
 handler = router({
     "GET /bills": list_bills,
     "GET /bills/{id}": get_bill,
     "POST /bills/{id}/decision": decide,
     "POST /bills/{id}/confirm": confirm,
     "POST /bills/{id}/receive": receive,
+    "POST /bills/{id}/withdraw": withdraw,
+    "POST /bills/{id}/void": void_bill,
 })

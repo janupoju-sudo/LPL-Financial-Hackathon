@@ -20,7 +20,7 @@ from decimal import ROUND_HALF_UP, Decimal
 from botocore.exceptions import ClientError
 
 from . import coa
-from .ddb import now_iso, pk, table, to_ddb
+from .ddb import get_ledger_entries, now_iso, pk, table, to_ddb, update_item
 
 
 class LedgerError(ValueError):
@@ -108,6 +108,18 @@ def bill_payment_lines(amount):
     return [{"account": coa.ACCOUNTS_PAYABLE, "debit": c}, {"account": coa.CASH, "credit": c}]
 
 
+def bill_accrual_reversal_lines(amount, expense_account):
+    """Reverse bill accrual: Dr 2000 Accounts payable / Cr expense."""
+    c = to_cents(amount)
+    return [{"account": coa.ACCOUNTS_PAYABLE, "debit": c}, {"account": str(expense_account), "credit": c}]
+
+
+def bill_payment_reversal_lines(amount):
+    """Reverse a mock bill payment: Dr 1000 Operating cash / Cr 2000 Accounts payable."""
+    c = to_cents(amount)
+    return [{"account": coa.CASH, "debit": c}, {"account": coa.ACCOUNTS_PAYABLE, "credit": c}]
+
+
 def payout_lines(amounts_by_type: dict):
     """Payout statement: Dr 1000 (total) / Cr 4100, 4200, 4300 (one line per revenue type).
 
@@ -124,6 +136,42 @@ def card_spend_lines(amount, expense_account):
     """Card spend (P1): Dr <expense> / Cr 2100 Credit card payable."""
     c = to_cents(amount)
     return [{"account": str(expense_account), "debit": c}, {"account": coa.CREDIT_CARD_PAYABLE, "credit": c}]
+
+
+def match_card_receipt(practice_id, document_id, amount, receipt_date, window_days=5):
+    """Attach a processed receipt to the closest unlinked card charge with the same amount."""
+    from datetime import date, timedelta
+
+    if amount in (None, "") or not receipt_date:
+        return None
+
+    target_date = date.fromisoformat(receipt_date)
+    amount_cents = to_cents(amount)
+    start = (target_date - timedelta(days=window_days)).isoformat()
+    end = (target_date + timedelta(days=window_days)).isoformat()
+    candidates = []
+    for line in get_ledger_entries(practice_id, start, end):
+        if (line.get("sourceType") != "card" or not line.get("debit")
+                or line["debit"] != amount_cents or line.get("sourceDocId")):
+            continue
+        gap = abs((date.fromisoformat(line["date"]) - target_date).days)
+        candidates.append((gap, line["date"], line["journalId"], line))
+
+    for _, _, _, line in sorted(candidates, key=lambda candidate: candidate[:3]):
+        try:
+            update_item(
+                practice_id,
+                line_sk(line),
+                set_fields={"sourceDocId": document_id},
+                condition="attribute_not_exists(sourceDocId) OR attribute_type(sourceDocId, :null_type)",
+                extra_values={":null_type": "NULL"},
+            )
+        except ClientError as exc:
+            if exc.response.get("Error", {}).get("Code") == "ConditionalCheckFailedException":
+                continue
+            raise
+        return line.get("sourceId")
+    return None
 
 
 def account_balances(lines) -> dict:

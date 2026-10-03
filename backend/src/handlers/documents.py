@@ -73,7 +73,7 @@ def list_docs(event):
     caller = get_caller(event)
     docs = repo.list_documents(caller.practice_id, query_param(event, "type"), query_param(event, "q"))
     keys = ("documentId", "type", "filename", "status", "vendorId", "vendorName", "amount",
-            "billId", "confidence", "createdAt", "locked", "review")
+            "billId", "confidence", "createdAt", "locked", "review", "uploadedBy")
     return 200, [{k: d.get(k) for k in keys if k in d} for d in map(public, docs)]
 
 
@@ -133,9 +133,38 @@ def resolve_doc(event):
     return 200, public(updated)
 
 
+def withdraw_document(event):
+    caller = get_caller(event)
+    require_role(caller, "owner", "ops")
+    document_id = path_param(event, "id")
+    doc = repo.get_document(caller.practice_id, document_id)
+    if not doc:
+        raise HttpError(404, "Document not found")
+    if not caller.has_any("owner") and doc.get("uploadedBy") != caller.sub:
+        raise HttpError(403, "Operations can withdraw only documents they uploaded")
+    if doc.get("status") != "needs_review" or doc.get("type") not in {"receipt", "unknown"}:
+        raise HttpError(409, "Only unlinked receipts or unrecognized documents awaiting review can be withdrawn")
+    if doc.get("billId"):
+        raise HttpError(409, "This document is linked to a bill; withdraw or void the bill instead")
+
+    reason = (parse_body(event).get("reason") or "").strip()[:500]
+    if not reason:
+        raise HttpError(400, "A withdrawal reason is required")
+    repo.update_document(
+        caller.practice_id,
+        document_id,
+        status="withdrawn",
+        withdrawalReason=f"Withdrawn by {caller.label}: {reason}",
+        withdrawnAt=repo.now_iso(),
+        audit=repo.audit_event(caller.label, "withdrawn", reason),
+    )
+    return 200, {"documentId": document_id, "status": "withdrawn"}
+
+
 handler = router({
     "POST /documents/upload-url": upload_url,
     "GET /documents": list_docs,
     "GET /documents/{id}": get_doc,
     "POST /documents/{id}/resolve": resolve_doc,
+    "POST /documents/{id}/withdraw": withdraw_document,
 })

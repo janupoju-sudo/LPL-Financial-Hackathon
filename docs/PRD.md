@@ -53,7 +53,7 @@ Ledgerline is an AI-native practice finance platform:
 ## 5. Scope
 
 ### P0: must ship for the demo
-- [ ] Upload invoice, receipt or void check → AI classifies and extracts fields → creates a Bill
+- [ ] Upload invoice → AI classifies and extracts fields → creates a Bill; receipts are matched to card charges instead of creating payables
 - [ ] **Vendor memory**: a second invoice from the same vendor auto-matches and pre-fills category and GL account
 - [ ] Rule-based **approval workflow** (amount threshold + new-vendor document check) with approve/reject in the UI
 - [ ] Approved bill → posts to ledger → marked "Scheduled" (payment is **mocked**)

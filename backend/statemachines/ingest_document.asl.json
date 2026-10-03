@@ -89,11 +89,6 @@
           "Variable": "$.classification.data.documentType",
           "StringEquals": "invoice",
           "Next": "PrepareBill"
-        },
-        {
-          "Variable": "$.classification.data.documentType",
-          "StringEquals": "receipt",
-          "Next": "PrepareBill"
         }
       ],
       "Default": "FinalizeDocument"

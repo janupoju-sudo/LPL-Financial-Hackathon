@@ -54,6 +54,45 @@ export const api = {
     if (USE_MOCKS || USE_LOCAL_API) throw new Error('Reviewing bills needs the live backend.');
     const result = await request<{ billId: string; status: string }>(`/bills/${encodeURIComponent(id)}/confirm`, review); changed(); return result;
   },
+  async withdrawBill(id: string, reason: string) {
+    if (USE_LOCAL_API) throw new Error('D’s local server does not support bill withdrawal.');
+    if (!USE_MOCKS) {
+      const result = await request<{ billId: string; status: string }>(`/bills/${encodeURIComponent(id)}/withdraw`, { reason });
+      changed();
+      return result;
+    }
+    const bill = bills.find(b => b.id === id);
+    if (!bill || !['pending_review', 'pending_approval', 'pending_docs'].includes(bill.status)) throw new Error('Only unposted bills can be withdrawn.');
+    bill.status = 'withdrawn';
+    changed();
+    return { billId: id, status: bill.status };
+  },
+  async voidBill(id: string, reason: string) {
+    if (USE_LOCAL_API) throw new Error('D’s local server does not support bill voids.');
+    if (!USE_MOCKS) {
+      const result = await request<{ billId: string; status: string }>(`/bills/${encodeURIComponent(id)}/void`, { reason });
+      changed();
+      return result;
+    }
+    const bill = bills.find(b => b.id === id);
+    if (!bill || !['approved', 'scheduled', 'voiding'].includes(bill.status)) throw new Error('Only posted bills can be voided.');
+    bill.status = 'voided';
+    changed();
+    return { billId: id, status: bill.status };
+  },
+  async withdrawDocument(id: string, reason: string) {
+    if (USE_LOCAL_API) throw new Error('D’s local server does not support document withdrawal.');
+    if (!USE_MOCKS) {
+      const result = await request<{ documentId: string; status: string }>(`/documents/${encodeURIComponent(id)}/withdraw`, { reason });
+      changed();
+      return result;
+    }
+    const doc = documents.find(d => d.id === id);
+    if (!doc || doc.status !== 'needs_review' || !['receipt', 'unknown'].includes(doc.type)) throw new Error('Only unlinked receipts or unrecognized documents awaiting review can be withdrawn.');
+    doc.status = 'withdrawn';
+    changed();
+    return { documentId: id, status: doc.status };
+  },
   transactions: (): Promise<CardTransaction[]> => USE_MOCKS || USE_LOCAL_API ? Promise.resolve([]) : request<CardTransaction[]>('/transactions'),
   rules: () => USE_LOCAL_API ? Promise.resolve([] as Rule[]) : USE_MOCKS ? Promise.resolve(clone(rules)) : request<ApiRule[]>('/rules').then(list => list.map(normalizeRule)),
   financials: (period: string) => MOCK_D ? Promise.resolve(mockFinancials()) : request<Financials | LegacyFinancials>(`/financials?period=${encodeURIComponent(period)}`).then(normalizeFinancials),
@@ -65,6 +104,7 @@ export const api = {
     const bill = bills.find(b => b.id === id);
     if (!bill || bill.status !== 'pending_approval') throw new Error('This bill is not awaiting approval.');
     if (role !== 'partner' && role !== 'owner') throw new Error('Switch to Owner or Partner to make a decision.');
+    if (role === 'partner' && !bill.requiredApprovers?.includes('partner')) throw new Error('This bill is not routed to a Partner.');
     if (decision === 'approve' && bill.ruleHits.some(hit => hit.includes('missing'))) throw new Error('Upload the vendor W-9 and void check before approval.');
     if (decision === 'approve' && changes) { if (changes.glAccount) bill.glAccount = changes.glAccount; if (changes.invoiceNumber !== undefined) bill.invoiceNumber = changes.invoiceNumber; if (changes.dueDate) bill.dueDate = changes.dueDate; }
     bill.status = decision === 'approve' ? 'scheduled' : 'rejected'; changed(); return { id, status: bill.status };

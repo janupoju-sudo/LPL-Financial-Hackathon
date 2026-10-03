@@ -9,7 +9,8 @@ UI upload ─► S3 uploads/<practiceId>/<documentId>/<file>
                  └─► YOUR IngestDocument state machine
                         classify ─► Textract ─► normalize ─► match vendor
                            │
-                           ├─ invoice / receipt ───► invoke CreateBillFunction  ─► ApproveBill workflow (built)
+                           ├─ invoice ──────────────► invoke CreateBillFunction  ─► ApproveBill workflow (built)
+                           ├─ receipt ─────────────► finalize + match card charge when available
                            ├─ w9 / void_check ─────► repo.record_vendor_docs     ─► held bills auto-resume (built)
                            └─ payout_statement ────► repo.put_revenue_lines + ledger.post_journal (payout)
 ```
@@ -28,7 +29,7 @@ repo.update_document(practice_id, document_id,
     confidence=0.93, extracted={...})
 ```
 
-## 3. Invoices & receipts → `CreateBillFunction`
+## 3. Invoices → `CreateBillFunction`
 Invoke it from your state machine (`arn:aws:states:::lambda:invoke`, ARN in deploy outputs):
 ```json
 {"practiceId": "p1", "documentId": "doc_..", "vendorId": "ven_..", "vendorName": "Orion Software LLC",
@@ -41,18 +42,23 @@ Invoke it from your state machine (`arn:aws:states:::lambda:invoke`, ARN in depl
 - `confidence < 0.8` or no amount/vendor → bill goes to **Needs Review** instead of auto-processing. That's intended.
 - Returns `{billId, status, isDuplicate}`. Duplicates (same vendor + invoice #) are blocked by the rules automatically.
 
-## 4. Vendor memory (the demo "wow")
+## 4. Receipts → card matching, not bills
+- A receipt never creates a payable bill.
+- Confidence below `0.8` sets document status to `needs_review`; otherwise it is `processed`.
+- Match a processed receipt to the closest unlinked card charge with the same amount within five days. This works whether the receipt or card CSV arrives first.
+
+## 5. Vendor memory (the demo "wow")
 In `shared/repo.py`: `list_vendors`, `find_vendor_by_name` (normalized exact + alias), `create_vendor`, **`add_vendor_alias`**.
 After a fuzzy match (e.g. "ORION SOFTWARE, INC." → Orion Software LLC), call `add_vendor_alias(p, vendor_id, raw_name)` so it's an exact hit next time.
 
-## 5. W-9 / void check
+## 6. W-9 / void check
 ```python
 repo.record_vendor_docs(practice_id, vendor_id, has_w9=True, has_void_check=True,
                         bank_last4="6789", document_id=doc_id)
 ```
 This emits `VendorUpdated`. Any bill on hold for that vendor re-runs the rules by itself. That's the "upload the W-9 and the bill un-blocks" demo moment.
 
-## 6. Payout statements
+## 7. Payout statements
 Two calls: one for reconciliation (D) and one for the ledger.
 ```python
 repo.put_revenue_lines(p, "2026-09", doc_id, [

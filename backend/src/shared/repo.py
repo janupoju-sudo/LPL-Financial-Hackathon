@@ -40,8 +40,11 @@ def get_document(practice_id, doc_id):
     return get_item(practice_id, f"DOC#{doc_id}")
 
 
-def update_document(practice_id, doc_id, **fields):
-    return update_item(practice_id, f"DOC#{doc_id}", set_fields={**fields, "updatedAt": now_iso()})
+def update_document(practice_id, doc_id, audit=None, **fields):
+    return update_item(
+        practice_id, f"DOC#{doc_id}", set_fields={**fields, "updatedAt": now_iso()},
+        append={"audit": [audit]} if audit else None,
+    )
 
 
 def list_documents(practice_id, doc_type=None, q=None):
@@ -141,10 +144,14 @@ def record_vendor_docs(practice_id, vendor_id, has_w9=None, has_void_check=None,
 BILL_STATUSES = (
     "pending_review",    # low-confidence extraction; a human must confirm fields
     "processing",        # workflow running
+    "scheduling",        # payment workflow claimed the bill for mock scheduling
     "pending_docs",      # on hold (missing vendor docs / not yet received)
     "pending_approval",  # waiting for an approver
     "approved",          # posted to ledger (accrual)
     "scheduled",         # mock payment scheduled + posted
+    "voiding",            # compensating journals are being posted
+    "voided",             # posted bill reversed with compensating journals
+    "withdrawn",          # uploader or owner withdrew before ledger posting
     "rejected",
 )
 
@@ -181,7 +188,8 @@ def is_duplicate_invoice(practice_id, vendor_id, invoice_number, exclude_bill_id
     if not vendor_id or not invoice_number:
         return False
     for b in list_bills_for_vendor(practice_id, vendor_id):
-        if b["billId"] != exclude_bill_id and b.get("invoiceNumber") == invoice_number and b.get("status") != "rejected":
+        if (b["billId"] != exclude_bill_id and b.get("invoiceNumber") == invoice_number
+                and b.get("status") not in {"rejected", "withdrawn", "voided"}):
             return True
     return False
 
