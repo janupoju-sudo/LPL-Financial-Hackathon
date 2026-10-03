@@ -46,7 +46,7 @@ export function Workspace() {
 
 function App({ signOut }: { signOut?: () => void }) {
   const pathname = usePathname(); const path = ['/inbox', '/library'].includes(pathname) ? '/documents' : pathname; const router = useRouter();
-  const [role, setRole] = useState<Role>('owner'); const [userName, setUserName] = useState('Maya Chen');
+  const [role, setRole] = useState<Role>('owner'); const [userName, setUserName] = useState('Maya Chen'); const [userId, setUserId] = useState('');
   const [documents, setDocuments] = useState<Document[]>([]); const [bills, setBills] = useState<Bill[]>([]); const [vendors, setVendors] = useState<Vendor[]>([]); const [rules, setRules] = useState<Rule[]>([]);
   const [financials, setFinancials] = useState<Financials>(); const [revenue, setRevenue] = useState<Reconciliation>();
   const [loading, setLoading] = useState(true); const [error, setError] = useState(''); const [toast, setToast] = useState('');
@@ -77,7 +77,7 @@ function App({ signOut }: { signOut?: () => void }) {
     document.addEventListener('keydown', onKey);
     return () => { document.removeEventListener('keydown', onKey); document.body.style.overflow = previousOverflow; previousFocus?.focus(); };
   }, [selected]);
-  useEffect(() => { if (USE_MOCKS || USE_LOCAL_API) return; import('aws-amplify/auth').then(async ({ fetchAuthSession }) => { const payload = (await fetchAuthSession()).tokens?.idToken?.payload; const groups = payload?.['cognito:groups']; if (typeof payload?.email === 'string') setUserName(displayName(payload.email)); if (Array.isArray(groups)) { const actual = groups.find(g => ['owner', 'partner', 'ops', 'lpl_bookkeeper'].includes(String(g))); if (actual) setRole(actual as Role); } }); }, []);
+  useEffect(() => { if (USE_MOCKS || USE_LOCAL_API) return; import('aws-amplify/auth').then(async ({ fetchAuthSession }) => { const payload = (await fetchAuthSession()).tokens?.idToken?.payload; const groups = payload?.['cognito:groups']; if (typeof payload?.email === 'string') setUserName(displayName(payload.email)); if (typeof payload?.sub === 'string') setUserId(payload.sub); if (Array.isArray(groups)) { const actual = groups.find(g => ['owner', 'partner', 'ops', 'lpl_bookkeeper'].includes(String(g))); if (actual) setRole(actual as Role); } }); }, []);
   useEffect(() => { if (!billDetail) return; const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setBillDetail(undefined); }; document.addEventListener('keydown', onKey); return () => document.removeEventListener('keydown', onKey); }, [billDetail]);
   const openBill = async (id: string) => { setBusy(id); try { setBillDetail(await api.bill(id)); } catch (e) { setToast(message(e)); } finally { setBusy(''); } };
   const openDoc = async (id: string) => { setBusy(id); try { setSelected(await api.document(id)); } catch (e) { setToast(message(e)); } finally { setBusy(''); } };
@@ -157,7 +157,7 @@ function App({ signOut }: { signOut?: () => void }) {
     </aside>
     {palette && <CommandPalette commands={commands} onClose={() => setPalette(false)} onAsk={q => openAsk(q)} />}
     {toast && <div className="toast" role="status"><CircleHelp size={18} /><span>{toast}</span><button aria-label="Dismiss notification" onClick={() => setToast('')}><X size={16} /></button></div>}
-    {billDetail && <BillDrawer bill={billDetail} role={role} busy={busy === billDetail.id} onDecide={(decision, comment) => void decide(billDetail, decision, comment)} onClose={() => setBillDetail(undefined)} onConfirmed={() => { setBillDetail(undefined); void refresh(); }} notify={setToast} openDoc={id => { setBillDetail(undefined); void openDoc(id); }} />}
+    {billDetail && <BillDrawer bill={billDetail} role={role} userId={userId} busy={busy === billDetail.id} onDecide={(decision, comment) => void decide(billDetail, decision, comment)} onClose={() => setBillDetail(undefined)} onConfirmed={() => { setBillDetail(undefined); void refresh(); }} notify={setToast} openDoc={id => { setBillDetail(undefined); void openDoc(id); }} />}
     {selected && <div className="modal-backdrop" onClick={() => setSelected(undefined)}><section className="document-modal" role="dialog" aria-modal="true" aria-label="Document detail" onClick={e => e.stopPropagation()}><div className="modal-title"><strong>Document detail</strong><button autoFocus aria-label="Close document" onClick={() => setSelected(undefined)}><X size={21} /></button></div><DocumentDetail doc={selected} vendors={vendors} /><Button variant="outline" onClick={() => { router.push(`/documents/${selected.id}`); setSelected(undefined); }}>Open full page <ArrowRight size={15} /></Button></section></div>}
   </div>;
 }
@@ -363,10 +363,13 @@ const EXPENSE_CHART: [string, string, [string, string][]][] = [
   ['6900', 'Other expenses', [['6910', 'Office supplies'], ['6920', 'Bank and card fees']]],
 ];
 const EXPENSE_ACCOUNTS: [string, string][] = EXPENSE_CHART.flatMap(([code, name, subs]) => [[code, name] as [string, string], ...subs]);
-function BillDrawer({ bill, role, busy: deciding, onDecide, onClose, onConfirmed, notify, openDoc }: { bill: BillDetail; role: Role; busy: boolean; onDecide: (decision: 'approve' | 'reject', comment: string) => void; onClose: () => void; onConfirmed: () => void; notify: (text: string) => void; openDoc: (id: string) => void }) {
+function BillDrawer({ bill, role, userId, busy: deciding, onDecide, onClose, onConfirmed, notify, openDoc }: { bill: BillDetail; role: Role; userId: string; busy: boolean; onDecide: (decision: 'approve' | 'reject', comment: string) => void; onClose: () => void; onConfirmed: () => void; notify: (text: string) => void; openDoc: (id: string) => void }) {
   const [busy, setBusy] = useState(false); const [comment, setComment] = useState(''); const [rejecting, setRejecting] = useState(false);
   const awaiting = bill.status === 'pending_approval';
-  const canDecide = canApprove(bill, role);
+  // Segregation of duties: whoever uploaded a bill can't approve it (the API refuses too).
+  const ownUpload = Boolean(userId && bill.createdBy && bill.createdBy === userId);
+  const approvers = (bill.requiredApprovers?.length ? bill.requiredApprovers : ['partner']).map(label).join(' or ');
+  const canDecide = canApprove(bill, role) && !ownUpload;
   const docsMissing = bill.ruleHits.some(h => h.toLowerCase().includes('missing'));
   const review = bill.status === 'pending_review';
   const gl = bill.glAccount.split(' ')[0];
@@ -383,14 +386,14 @@ function BillDrawer({ bill, role, busy: deciding, onDecide, onClose, onConfirmed
     <dl className="bill-facts"><div><dt>Category</dt><dd>{bill.glAccount || '—'}</dd>{bill.glAccountReason && <small className="table-sub">{bill.glAccountReason}</small>}</div><div><dt>Due</dt><dd>{bill.dueDate || '—'}</dd></div>{bill.requiredApprovers?.length ? <div><dt>Needs approval from</dt><dd>{bill.requiredApprovers.map(label).join(', ')}</dd></div> : null}{bill.payment?.scheduledFor && <div><dt>Payment</dt><dd>{bill.payment.method} on {bill.payment.scheduledFor}{bill.payment.confirmation ? ` · ${bill.payment.confirmation}` : ''}</dd></div>}{bill.rejectionReason && <div><dt>Rejected because</dt><dd>{bill.rejectionReason}</dd></div>}</dl>
     {bill.ruleHits.length > 0 && <div>{bill.ruleHits.map(hit => <small className="rule-hit" key={hit}>{hit}</small>)}</div>}
     {awaiting && <section className="approval-panel">
-      <h2>{canDecide ? 'Waiting for your approval' : `Waiting for ${(bill.requiredApprovers?.length ? bill.requiredApprovers : ['partner']).map(label).join(' or ')} approval`}</h2>
+      <h2>{canDecide ? 'Waiting for your approval' : `Pending ${approvers} approval`}</h2>
       <p className="muted">Check the invoice and why it was routed{bill.docId ? '' : ''}, then decide. Approving posts it to the ledger and schedules the (mock) payment.</p>
       {bill.docId && <Button variant="outline" onClick={() => openDoc(bill.docId!)}><FileText size={15} />Open the invoice</Button>}
       {canDecide ? <>
         <label className="approval-comment">{rejecting ? 'Reason for rejecting (required)' : 'Comment (optional)'}<textarea value={comment} onChange={e => setComment(e.target.value)} rows={2} maxLength={500} placeholder={rejecting ? 'e.g. Duplicate of last month’s invoice' : 'e.g. Approved for the Q4 CRM renewal'} /></label>
         {docsMissing && <p className="text-red">This vendor is still missing a W-9 or void check. Approval unlocks once those arrive.</p>}
         <div className="decision-buttons">{rejecting ? <><Button variant="destructive" disabled={deciding || !comment.trim()} onClick={() => onDecide('reject', comment)}>{deciding ? 'Rejecting…' : 'Confirm reject'}</Button><Button variant="outline" disabled={deciding} onClick={() => setRejecting(false)}>Cancel</Button></> : <><Button disabled={deciding || docsMissing} onClick={() => onDecide('approve', comment)}><Check size={15} />{deciding ? 'Approving…' : `Approve ${cents(bill.amount)}`}</Button><Button variant="outline" disabled={deciding} onClick={() => setRejecting(true)}>Reject…</Button></>}</div>
-      </> : <p className="muted">You're signed in as {label(role)}. Only {(bill.requiredApprovers?.length ? bill.requiredApprovers : ['partner']).map(label).join(' or ')} or the owner can approve this bill.</p>}
+      </> : ownUpload ? <p className="muted">You uploaded this bill, so someone else has to approve it (segregation of duties). It's waiting for {approvers} approval; they'll see it in their Waiting on you list.</p> : <p className="muted">You're signed in as {label(role)}. Only {approvers} or the owner can approve this bill.</p>}
     </section>}
     {review && <form className="rule-form review-form" onSubmit={confirm}><h2>Review extracted fields</h2><p className="muted">The AI wasn’t confident about this one. Check the fields against the document, then confirm.</p><div className="form-row"><label>Vendor<input name="vendorName" defaultValue={bill.vendor} required maxLength={120} /></label><label>Amount ($)<input name="amount" inputMode="decimal" defaultValue={bill.amount ? String(bill.amount) : ''} required /></label></div><div className="form-row"><label>Category<select name="glAccount" defaultValue={EXPENSE_ACCOUNTS.some(([code]) => code === gl) ? gl : '6900'}>{EXPENSE_CHART.map(([code, name, subs]) => <optgroup key={code} label={`${code} · ${name}`}><option value={code}>{code} · {name} (general)</option>{subs.map(([sub, subName]) => <option key={sub} value={sub}>{sub} · {subName}</option>)}</optgroup>)}</select></label><label>Invoice number<input name="invoiceNumber" defaultValue={bill.invoiceNumber ?? ''} maxLength={60} /></label><label>Due date<input name="dueDate" type="date" defaultValue={bill.dueDate ?? ''} /></label></div><Button disabled={busy}>{busy ? 'Confirming…' : 'Confirm and continue'}</Button></form>}
     <h3 className="audit-heading">History</h3>{bill.audit.length ? <ol className="audit-trail">{bill.audit.map((a, i) => <li key={i}><div><strong>{label(a.action)}</strong> <span className="muted">by {a.actor}</span></div><small className="muted">{new Date(a.at).toLocaleString()}</small>{a.detail && <p>{a.detail}</p>}</li>)}</ol> : <p className="muted">No history recorded yet.</p>}
