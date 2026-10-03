@@ -47,7 +47,7 @@ export function Workspace() {
 
 function App({ signOut }: { signOut?: () => void }) {
   const pathname = usePathname(); const path = ['/inbox', '/library'].includes(pathname) ? '/documents' : pathname; const router = useRouter();
-  const [role, setRole] = useState<Role>('lpl_bookkeeper'); const [roleLoaded, setRoleLoaded] = useState(USE_MOCKS || USE_LOCAL_API); const [userName, setUserName] = useState('Maya Chen'); const [userId, setUserId] = useState('');
+  const [role, setRole] = useState<Role>(USE_MOCKS || USE_LOCAL_API ? 'owner' : 'lpl_bookkeeper'); const [roleLoaded, setRoleLoaded] = useState(USE_MOCKS || USE_LOCAL_API); const [userName, setUserName] = useState('Maya Chen'); const [userId, setUserId] = useState('');
   const [documents, setDocuments] = useState<Document[]>([]); const [bills, setBills] = useState<Bill[]>([]); const [vendors, setVendors] = useState<Vendor[]>([]); const [rules, setRules] = useState<Rule[]>([]);
   const [financials, setFinancials] = useState<Financials>(); const [revenue, setRevenue] = useState<Reconciliation>();
   const [loading, setLoading] = useState(true); const [error, setError] = useState(''); const [toast, setToast] = useState('');
