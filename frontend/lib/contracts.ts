@@ -34,7 +34,7 @@ export function normalizeReconciliation(response: Reconciliation | MainReconcili
  * Map those to the frontend types at the boundary; mock fixtures already use the frontend shape. */
 type Hit = string | { ruleId?: string; name?: string; action?: string; reason?: string };
 export type ApiDocument = Omit<Document, 'id'> & { documentId: string; id?: string };
-export type ApiBill = Partial<Omit<Bill, 'ruleHits'>> & { billId: string; documentId?: string; vendorName?: string; glAccountName?: string; ruleHits?: Hit[]; audit?: AuditEvent[]; payment?: BillDetail['payment']; rejectionReason?: string; invoiceDate?: string };
+export type ApiBill = Partial<Omit<Bill, 'ruleHits'>> & { billId: string; documentId?: string; vendorName?: string; glAccountName?: string; ruleHits?: Hit[]; audit?: AuditEvent[]; payment?: BillDetail['payment']; rejectionReason?: string; invoiceDate?: string; createdBy?: string };
 export type ApiVendor = Omit<Vendor, 'id'> & { vendorId: string; id?: string };
 export type ApiRule = Omit<Rule, 'id' | 'action'> & { ruleId: string; id?: string; action: Rule['action'] | 'hold' };
 
@@ -55,6 +55,7 @@ export function normalizeBill(bill: ApiBill): Bill {
     ...(bill.invoiceNumber ? { invoiceNumber: bill.invoiceNumber } : {}),
     ...(bill.requiredApprovers ? { requiredApprovers: bill.requiredApprovers } : {}),
     ...(bill.createdAt ? { createdAt: bill.createdAt } : {}),
+    ...(bill.createdBy ? { createdBy: bill.createdBy } : {}),
   };
 }
 export const normalizeBillDetail = (bill: ApiBill): BillDetail => ({
