@@ -18,6 +18,7 @@ export interface Financials {
   cashFlow: { period: string; beginningCash: number; operating: { label: string; amount: number }[]; netOperating: number; financing: { label: string; amount: number }[]; netFinancing: number; netChange: number; endingCash: number };
   kpis: { margin: number | null; recurringPct: number | null; revPerClient: number | null; expenseRatios: { account: string; name: string; ratio: number | null }[]; previous: { period: string; totalRevenue: number; margin: number | null; recurringPct: number | null } };
   valuation: { low: number; mid: number; high: number; method: string; recurringRevenueTtm: number; multiples: { low: number; mid: number; high: number } };
+  monthly?: { month: string; period: string; revenue: number; expenses: number }[];
 }
 export type ReconciliationStatus = 'ok' | 'short' | 'over' | 'missing' | 'unexpected';
 export interface Reconciliation {
