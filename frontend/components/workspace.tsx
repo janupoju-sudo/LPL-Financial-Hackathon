@@ -4,10 +4,11 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Amplify } from 'aws-amplify';
-import { Authenticator } from '@aws-amplify/ui-react';
+import { Authenticator, useAuthenticator } from '@aws-amplify/ui-react';
+import { MotionConfig } from 'motion/react';
 import '@aws-amplify/ui-react/styles.css';
 import { Area, AreaChart, Bar, BarChart, Cell, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { ArrowDown, ArrowDownToLine, ArrowRight, ArrowUp, ArrowUpRight, BookOpen, Check, CircleHelp, CreditCard, FileText, FolderOpen, Home, LoaderCircle, LogOut, Moon, Plus, Search, Send, ShieldCheck, SlidersHorizontal, Sparkles, Trash2, UploadCloud, Wallet, X } from 'lucide-react';
+import { ArrowDown, ArrowDownToLine, ArrowRight, ArrowUp, ArrowUpRight, Check, CircleHelp, CreditCard, FileText, FolderOpen, Home, LoaderCircle, LogOut, Moon, Plus, Search, Send, ShieldCheck, SlidersHorizontal, Sparkles, Trash2, UploadCloud, Wallet, X } from 'lucide-react';
 import { api, subscribe, USE_MOCKS, USE_LOCAL_API } from '@/lib/api';
 import type { Answer, Bill, BillApprovalChanges, BillDetail, BillReview, CardTransaction, Document, Financials, Reconciliation, Role, Rule, RuleCondition, Vendor } from '@/lib/types';
 import { Button } from '@/components/ui/button';
@@ -16,6 +17,10 @@ import { Revenue } from './revenue-view';
 import { percent } from '@/lib/format';
 import { ProfileSettings } from './profile-settings';
 import { canApproveBill, canImportTransactions, canManageRules, canReviewDocuments, canUploadDocuments } from '@/lib/permissions';
+import { Landing } from './landing';
+import { OnboardingWizard } from './onboarding/wizard';
+import { LOGIN_PREFILL_KEY } from './onboarding/data';
+import { OtterLogo, OtterMark } from './brand';
 
 const money = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n);
 function Amount({ value }: { value: number }) { const [whole, frac] = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value).split('.'); return <>{whole}<small>.{frac}</small></>; }
@@ -40,9 +45,58 @@ const authConfigured = Boolean(process.env.NEXT_PUBLIC_COGNITO_USER_POOL_ID && p
 if (authConfigured) Amplify.configure({ Auth: { Cognito: { userPoolId: process.env.NEXT_PUBLIC_COGNITO_USER_POOL_ID!, userPoolClientId: process.env.NEXT_PUBLIC_COGNITO_CLIENT_ID! } } });
 
 export function Workspace() {
-  if (USE_MOCKS || USE_LOCAL_API) return <App />;
-  if (!authConfigured) return <main className="login"><BookOpen size={36} /><h1>Connect your practice</h1><p>Set the Cognito user pool and client ID in frontend/.env.local to enable secure sign-in.</p></main>;
-  return <Authenticator hideSignUp>{({ signOut }) => <App signOut={signOut} />}</Authenticator>;
+  if (USE_MOCKS || USE_LOCAL_API) return <MotionConfig reducedMotion="user"><MockGate /></MotionConfig>;
+  if (!authConfigured) return <main className="login"><OtterMark size={40} /><h1>Connect your practice</h1><p>Set the Cognito user pool and client ID in frontend/.env.local to enable secure sign-in.</p></main>;
+  return <MotionConfig reducedMotion="user"><Authenticator.Provider><AuthGate /></Authenticator.Provider></MotionConfig>;
+}
+
+// Signed-out pages. The landing page and wizard are a demo of onboarding: no account is created
+// (self-signup is off), the wizard ends at sign-in with the email filled in.
+const ENTRY_PATHS = ['/login', '/signup', '/welcome'];
+
+// Mock/local mode has no sign-in, so the landing page lives at /welcome and the app stays at /.
+function MockGate() {
+  const pathname = usePathname(); const router = useRouter();
+  if (pathname === '/welcome') return <Landing onStart={() => router.push('/signup')} onSignIn={() => router.push('/')} />;
+  if (pathname === '/signup') return <OnboardingWizard live={false} onFinish={() => router.push('/')} onSignIn={() => router.push('/')} onExit={() => router.push('/welcome')} />;
+  return <App />;
+}
+
+function AuthGate() {
+  const { authStatus, signOut } = useAuthenticator(ctx => [ctx.authStatus]);
+  const pathname = usePathname(); const router = useRouter();
+  const signedIn = authStatus === 'authenticated';
+  useEffect(() => { if (signedIn && ENTRY_PATHS.includes(pathname)) router.replace('/'); }, [signedIn, pathname, router]);
+  if (authStatus === 'configuring' || (signedIn && ENTRY_PATHS.includes(pathname))) return <div className="gate-loading" />;
+  if (signedIn) return <App signOut={signOut} />;
+  if (pathname === '/') return <Landing onStart={() => router.push('/signup')} onSignIn={() => router.push('/login')} />;
+  if (pathname === '/signup') return <OnboardingWizard live onFinish={email => { try { sessionStorage.setItem(LOGIN_PREFILL_KEY, email); } catch { /* prefill is optional */ } router.push('/login'); }} onSignIn={() => router.push('/login')} onExit={() => router.push('/')} />;
+  return <SignIn onHome={() => router.push('/')} onSignup={() => router.push('/signup')} />;
+}
+
+const SIGN_IN_FIELDS = { signIn: { username: { label: 'Email', placeholder: 'you@practice.com' } } };
+
+function SignIn({ onHome, onSignup }: { onHome: () => void; onSignup: () => void }) {
+  // Amplify's form has no prefill option, so set the email field the way typing would.
+  useEffect(() => {
+    let email = ''; try { email = sessionStorage.getItem(LOGIN_PREFILL_KEY) ?? ''; } catch { /* no prefill */ }
+    if (!email) return;
+    let tries = 0;
+    const timer = setInterval(() => {
+      const input = document.querySelector<HTMLInputElement>('[data-amplify-authenticator] input[name="username"]');
+      if (input || ++tries > 40) clearInterval(timer);
+      if (!input || input.value) return;
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(input, email);
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      document.querySelector<HTMLInputElement>('[data-amplify-authenticator] input[name="password"]')?.focus();
+    }, 50);
+    return () => clearInterval(timer);
+  }, []);
+  const components = useMemo(() => ({
+    Header: () => <div className="signin-head"><button type="button" onClick={onHome} aria-label="Back to the Otter home page"><OtterLogo height={30} /></button></div>,
+    Footer: () => <p className="signin-foot">New to Otter? <button type="button" onClick={onSignup}>Set up your practice</button></p>,
+  }), [onHome, onSignup]);
+  return <Authenticator hideSignUp components={components} formFields={SIGN_IN_FIELDS} />;
 }
 
 function App({ signOut }: { signOut?: () => void }) {
@@ -100,8 +154,10 @@ function App({ signOut }: { signOut?: () => void }) {
   const canReview = roleLoaded && canReviewDocuments(role);
   const canImport = roleLoaded && canImportTransactions(role);
   const attention = bills.filter(b => (b.status === 'pending_review' && canReview) || (b.status === 'pending_approval' && canApprove(b, role, userId))).length;
-  const docsWaiting = documents.filter(d => !DONE_STATUSES.includes(d.status)).length;
-  const counts: Record<string, number> = { '/revenue': revenue?.flags.length ?? 0, '/bills': attention, '/documents': docsWaiting };
+  // A document follows its bill once the bill moves past review (approved, scheduled, on hold, rejected).
+  const docs = useMemo(() => withBillStatus(documents, bills), [documents, bills]);
+  const docsWaiting = docs.filter(d => NEEDS_ATTENTION.includes(d.status)).length;
+  const counts: Record<string, number> = { '/revenue': revenue ? (statementMissing(revenue) ? 1 : revenue.flags.length) : 0, '/bills': attention, '/documents': docsWaiting };
   const subnav = SUBNAV.map(group => group.filter(item => item.path !== '/rules' || (roleLoaded && canManageRules(role)))).find(group => group.some(item => item.path === path));
   const openAsk = useCallback((q?: string) => { setAskOpen(true); if (q) setAskRequest(r => ({ q, n: (r?.n ?? 0) + 1 })); }, []);
   useEffect(() => { if (path === '/ask') { openAsk(); router.replace('/'); } }, [path, openAsk, router]);
@@ -120,12 +176,12 @@ function App({ signOut }: { signOut?: () => void }) {
     ...ASK_SUGGESTIONS.map(q => ({ group: 'Ask your books', label: q, icon: Sparkles, run: () => openAsk(q) })),
     ...nav.map(n => ({ group: 'Go to', label: n.name, icon: n.icon, hint: n.path, run: () => router.push(n.path) })),
     ...SUBNAV.flat().filter(n => n.path !== '/rules' || (roleLoaded && canManageRules(role))).map(n => ({ group: 'Go to', label: n.name, icon: n.icon, hint: n.path, run: () => router.push(n.path) })),
-    ...documents.slice(0, 60).map(d => ({ group: 'Documents', label: d.filename, icon: FileText, hint: d.vendorName, run: () => void openDoc(d.id) })),
-  ], [bills, documents, period, openAsk, router, canUpload, canReview, role, roleLoaded, userId, exportPackage, openBill, openDoc]);
+    ...docs.slice(0, 60).map(d => ({ group: 'Documents', label: d.filename, icon: FileText, hint: d.vendorName, run: () => void openDoc(d.id) })),
+  ], [bills, docs, period, openAsk, router, canUpload, canReview, role, roleLoaded, userId, exportPackage, openBill, openDoc]);
   return <div className="app-shell">
     <div className="backdrop" aria-hidden="true"><i /><i /><i /></div>
     <aside className="sidebar">
-      <Link className="brand" href="/"><span className="brand-icon"><BookOpen size={17} /></span><span><strong>Ledgerline</strong><small>Harbor Point Wealth</small></span></Link>
+      <Link className="brand" href="/"><span className="brand-icon otter"><OtterMark size={30} /></span><span><strong>Otter</strong><small>Harbor Point Wealth</small></span></Link>
       <nav aria-label="Main">{nav.map(item => { const active = isActive(item.match, path); const count = counts[item.path] ?? 0; return <Link className={`nav-item ${active ? 'active' : ''}`} aria-current={active ? 'page' : undefined} href={item.path} key={item.path}><item.icon size={19} /><span>{item.name}</span>{count > 0 && <span className="nav-count" aria-label={`${count} need attention`}>{count}</span>}</Link>; })}</nav>
       <div className="sidebar-bottom">
         <button className="side-link" onClick={() => openAsk()}><Sparkles size={18} />Ask your books</button>
@@ -143,12 +199,12 @@ function App({ signOut }: { signOut?: () => void }) {
         {subnav && <nav className="subnav" aria-label="Section">{subnav.map(item => <Link key={item.path} href={item.path} className={path === item.path ? 'active' : ''} aria-current={path === item.path ? 'page' : undefined}><item.icon size={15} />{item.name}</Link>)}</nav>}
         {loading ? <div className="skeleton-grid" aria-label="Loading practice data">{[1, 2, 3, 4, 5, 6].map(n => <div key={n} className="skeleton" />)}</div> : <>
           {path === '/' && financials && <Dashboard userName={userName} userId={userId} role={role} canUpload={canUpload} canReview={canReview} data={financials} bills={bills} revenue={revenue} period={period} setPeriod={setPeriod} exportPackage={exportPackage} exporting={busy === 'export'} openAsk={openAsk} openBill={openBill} />}
-          {path === '/documents' && <Suspense fallback={<Empty text="Loading documents..." />}><DocumentsPage documents={documents} vendors={vendors} bills={bills} openDoc={openDoc} openBill={openBill} onUpload={doc => { setSelected(doc); void refresh(); }} notify={setToast} exportPackage={exportPackage} exporting={busy === 'export'} legacyUpload={pathname === '/inbox'} canUpload={canUpload} canReview={canReview} /></Suspense>}
+          {path === '/documents' && <Suspense fallback={<Empty text="Loading documents..." />}><DocumentsPage documents={docs} vendors={vendors} bills={bills} openDoc={openDoc} openBill={openBill} onUpload={doc => { setSelected(doc); void refresh(); }} notify={setToast} exportPackage={exportPackage} exporting={busy === 'export'} legacyUpload={pathname === '/inbox'} canUpload={canUpload} canReview={canReview} /></Suspense>}
           {path === '/bills' && <><PageHeading eyebrow="MONEY OUT" title="Bills & approvals" description="Every payment, with the right checks in place." action={canUpload && <Link className="button primary" href="/documents?upload=1"><Plus size={16} /> Upload a bill</Link>} /><div className="summary-strip"><span><strong>{pending.length}</strong> awaiting your approval</span><span><strong>{money(pending.reduce((s, b) => s + b.amount, 0))}</strong> your pending total</span><span><ShieldCheck size={16} /> Payments are simulated</span></div><BillsTable bills={bills} role={role} userId={userId} busy={busy} decide={decide} openDoc={openDoc} openBill={openBill} /></>}
           {path === '/revenue' && revenue && <Revenue data={revenue} openDoc={openDoc} />}
           {path === '/rules' && (roleLoaded && canManageRules(role) ? <Rules rules={rules} notify={setToast} refresh={refresh} /> : <Empty text="Only the owner can manage approval rules." />)}
           {path === '/transactions' && <Transactions notify={setToast} openDoc={openDoc} canImport={canImport} />}
-          {path.startsWith('/documents/') && <DocumentRoute id={decodeURIComponent(path.split('/')[2] ?? '')} />}
+          {path.startsWith('/documents/') && <DocumentRoute id={decodeURIComponent(path.split('/')[2] ?? '')} role={role} />}
           {!ROUTES.includes(path) && !path.startsWith('/documents/') && <Empty text="This page does not exist." />}
         </>}
         <footer className="footer"><span><ShieldCheck size={13} /> {USE_MOCKS ? 'Sample workspace · fictional data' : 'Secure practice workspace'}</span><span>Made for the business behind your advice.</span></footer>
@@ -162,7 +218,7 @@ function App({ signOut }: { signOut?: () => void }) {
     {palette && <CommandPalette commands={commands} onClose={() => setPalette(false)} onAsk={q => openAsk(q)} />}
     {toast && <div className="toast" role="status"><CircleHelp size={18} /><span>{toast}</span><button aria-label="Dismiss notification" onClick={() => setToast('')}><X size={16} /></button></div>}
     {billDetail && <BillDrawer bill={billDetail} role={role} userId={userId} busy={busy === billDetail.id} onDecide={(decision, comment, changes) => void decide(billDetail, decision, comment, changes)} onClose={() => setBillDetail(undefined)} onConfirmed={() => { setBillDetail(undefined); void refresh(); }} notify={setToast} openDoc={id => { setBillDetail(undefined); void openDoc(id); }} />}
-    {selected && <div className="modal-backdrop" onClick={() => setSelected(undefined)}><section className="document-modal" role="dialog" aria-modal="true" aria-label="Document detail" onClick={e => e.stopPropagation()}><div className="modal-title"><strong>Document detail</strong><button autoFocus aria-label="Close document" onClick={() => setSelected(undefined)}><X size={21} /></button></div><DocumentDetail doc={selected} vendors={vendors} /><Button variant="outline" onClick={() => { router.push(`/documents/${selected.id}`); setSelected(undefined); }}>Open full page <ArrowRight size={15} /></Button></section></div>}
+    {selected && <div className="modal-backdrop" onClick={() => setSelected(undefined)}><section className="document-modal" role="dialog" aria-modal="true" aria-label="Document detail" onClick={e => e.stopPropagation()}><div className="modal-title"><strong>Document detail</strong><button autoFocus aria-label="Close document" onClick={() => setSelected(undefined)}><X size={21} /></button></div><DocumentDetail doc={selected} vendors={vendors} role={role} notify={setToast} onResolved={doc => { setSelected(doc); void refresh(); }} /><Button variant="outline" onClick={() => { router.push(`/documents/${selected.id}`); setSelected(undefined); }}>Open full page <ArrowRight size={15} /></Button></section></div>}
   </div>;
 }
 function toggleTheme() {
@@ -222,7 +278,7 @@ function Dashboard({ userName, userId, role, canUpload, canReview, data, bills, 
       <section className="panel chart-panel"><div className="panel-heading"><div><h2>Financial statements</h2><p>Income statement, balance sheet and cash flow for the selected period.</p></div><span className="muted">USD</span></div><div className="tabs" role="tablist">{['Income statement', 'Balance sheet', 'Cash flow'].map(name => <button role="tab" aria-selected={tab === name} className={tab === name ? 'selected' : ''} key={name} onClick={() => setTab(name)}>{name}</button>)}</div>{tab === 'Income statement' ? <>{data.monthly?.length ? <><div className="chart-legend"><span><i className="green" /> Revenue</span><span><i className="gray" /> Expenses</span><span className="chart-period">Last {data.monthly.length} months</span></div><div className="chart"><ResponsiveContainer width="100%" height="100%"><AreaChart data={data.monthly} margin={{ top: 16, right: 16, left: 4, bottom: 0 }}><defs><linearGradient id="revFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="var(--chart-1)" stopOpacity={.12} /><stop offset="100%" stopColor="var(--chart-1)" stopOpacity={0} /></linearGradient><linearGradient id="expFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="var(--chart-2)" stopOpacity={.28} /><stop offset="100%" stopColor="var(--accent)" stopOpacity={0} /></linearGradient></defs><CartesianGrid vertical={false} stroke="var(--chart-grid)" /><XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: 'var(--muted)' }} dy={10} /><YAxis axisLine={false} tickLine={false} width={56} tickFormatter={v => `$${Math.round(v / 1000)}k`} tick={{ fontSize: 11, fill: 'var(--faint)' }} /><Tooltip formatter={value => money(Number(value))} contentStyle={{ background: 'var(--surface)', borderColor: 'var(--line)', color: 'var(--ink)', borderRadius: 8, fontSize: 12 }} itemStyle={{ color: 'var(--ink)' }} cursor={{ stroke: 'var(--line-strong)' }} /><Area type="monotone" dataKey="revenue" name="Revenue" stroke="var(--chart-1)" strokeWidth={2} fill="url(#revFill)" dot={false} activeDot={{ r: 4 }} /><Area type="monotone" dataKey="expenses" name="Expenses" stroke="var(--chart-2)" strokeWidth={2} fill="url(#expFill)" dot={false} activeDot={{ r: 4 }} /></AreaChart></ResponsiveContainer></div></> : <><div className="chart-legend"><span><i className="green" /> Revenue</span><span><i className="gray" /> Expenses</span><span className="chart-period">Selected period totals</span></div><div className="chart"><ResponsiveContainer width="100%" height="100%"><BarChart data={[{ name: 'Revenue', amount: data.pnl.totalRevenue }, { name: 'Expenses', amount: data.pnl.totalExpenses }, { name: 'Operating income', amount: data.pnl.operatingIncome }]} margin={{ top: 15, right: 12, left: 4, bottom: 0 }}><CartesianGrid vertical={false} stroke="var(--chart-grid)" /><XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: 'var(--muted)' }} dy={10} /><YAxis axisLine={false} tickLine={false} width={56} tickFormatter={v => `$${Math.round(v / 1000)}k`} tick={{ fontSize: 11, fill: 'var(--faint)' }} /><Tooltip formatter={value => money(Number(value))} contentStyle={{ background: 'var(--surface)', borderColor: 'var(--line)', color: 'var(--ink)', borderRadius: 8, fontSize: 12 }} itemStyle={{ color: 'var(--ink)' }} cursor={{ fill: 'var(--hover)' }} /><Bar dataKey="amount" name="Amount" radius={[5, 5, 0, 0]} maxBarSize={56}><Cell fill="var(--chart-1)" /><Cell fill="var(--chart-2)" /><Cell fill="var(--faint)" /></Bar></BarChart></ResponsiveContainer></div></>}<FinancialStatement data={data} tab={tab} /><div className="chart-bottom"><span>Operating income <strong>{money(data.pnl.operatingIncome)}</strong></span><button onClick={() => openAsk()}>Explore your numbers <ArrowRight size={14} /></button></div></> : <FinancialStatement data={data} tab={tab} />}</section>
       <section className="panel recent-panel"><div className="panel-heading"><div><h2>Recent bills</h2><p>The latest in your back office.</p></div><Link href="/bills">View all</Link></div><div className="table-scroll"><table><thead><tr><th>Vendor</th><th>Category</th><th>Amount</th><th>Status</th></tr></thead><tbody>{bills.slice(0, 4).map(b => <tr key={b.id}><td><span className="vendor-cell"><span className="vendor-avatar">{b.vendor.slice(0, 2).toUpperCase()}</span>{b.vendor}</span></td><td className="muted">{b.glAccount.split('·')[1] ?? b.glAccount}</td><td className="amount">{cents(b.amount)}</td><td><Pill status={b.status} /></td></tr>)}</tbody></table></div></section>
     </div><div className="home-side">
-      <section className="panel attention-panel"><div className="panel-heading"><div><h2>Waiting on you</h2><p>A little action goes a long way.</p></div><span className="count-bubble">{pending.length + (revenue?.flags.length ?? 0)}</span></div><div className="queue">{pending.slice(0, 3).map(bill => bill.status === 'pending_review' ? <button className="attention-item" key={bill.id} onClick={() => openBill(bill.id)}><span className="attention-icon amber"><FileText size={17} /></span><div><strong>{bill.vendor || 'Unknown vendor'}</strong><p>Review extracted fields <i>·</i> {money(bill.amount)}</p></div><ArrowRight size={15} /></button> : <button className="attention-item" key={bill.id} onClick={() => openBill(bill.id)}><span className="attention-icon amber"><Wallet size={17} /></span><div><strong>{bill.vendor}</strong><p>{canApprove(bill, role, userId) ? 'Awaiting your approval' : `Pending ${approverNames(bill)} approval`} <i>·</i> {money(bill.amount)}</p>{bill.ruleHits[0] && <small>{bill.ruleHits[0]}</small>}</div><ArrowRight size={15} /></button>)}{revenue?.flags.map(flag => <Link className="attention-item" href="/revenue" key={flag.lineId}><span className="attention-icon coral"><ArrowDown size={17} /></span><div><strong>{revenue.lines.find(line => line.id === flag.lineId)?.label ?? 'Revenue variance'}</strong><small className={flag.severity === 'high' ? 'text-red' : ''}>{flag.message}</small></div><ArrowRight size={15} /></Link>)}{pending.length === 0 && !revenue?.flags.length && <Empty text="You're all caught up." />}</div><Link href="/bills" className="panel-bottom-link">View all bills <ArrowRight size={14} /></Link></section>
+      <section className="panel attention-panel"><div className="panel-heading"><div><h2>Waiting on you</h2><p>A little action goes a long way.</p></div><span className="count-bubble">{pending.length + (revenue ? (statementMissing(revenue) ? 1 : revenue.flags.length) : 0)}</span></div><div className="queue">{pending.slice(0, 3).map(bill => bill.status === 'pending_review' ? <button className="attention-item" key={bill.id} onClick={() => openBill(bill.id)}><span className="attention-icon amber"><FileText size={17} /></span><div><strong>{bill.vendor || 'Unknown vendor'}</strong><p>Review extracted fields <i>·</i> {money(bill.amount)}</p></div><ArrowRight size={15} /></button> : <button className="attention-item" key={bill.id} onClick={() => openBill(bill.id)}><span className="attention-icon amber"><Wallet size={17} /></span><div><strong>{bill.vendor}</strong><p>{canApprove(bill, role, userId) ? 'Awaiting your approval' : `Pending ${approverNames(bill)} approval`} <i>·</i> {money(bill.amount)}</p>{bill.ruleHits[0] && <small>{bill.ruleHits[0]}</small>}</div><ArrowRight size={15} /></button>)}{revenue && statementMissing(revenue) ? <Link className="attention-item" href="/revenue"><span className="attention-icon coral"><ArrowDown size={17} /></span><div><strong>Payout statement not uploaded</strong><small>Upload this month’s LPL statement to reconcile {money(revenue.expected)} of expected revenue.</small></div><ArrowRight size={15} /></Link> : revenue?.flags.map(flag => <Link className="attention-item" href="/revenue" key={flag.lineId}><span className="attention-icon coral"><ArrowDown size={17} /></span><div><strong>{revenue.lines.find(line => line.id === flag.lineId)?.label ?? 'Revenue variance'}</strong><small className={flag.severity === 'high' ? 'text-red' : ''}>{flag.message}</small></div><ArrowRight size={15} /></Link>)}{pending.length === 0 && !revenue?.flags.length && !(revenue && statementMissing(revenue)) && <Empty text="You're all caught up." />}</div><Link href="/bills" className="panel-bottom-link">View all bills <ArrowRight size={14} /></Link></section>
       <section className="insight-card"><span className="insight-icon"><Sparkles size={19} /></span><h2>Ask your books</h2><p>Answers grounded in your documents, with sources.</p><div className="suggestions">{ASK_SUGGESTIONS.map(q => <button key={q} className="suggestion" onClick={() => openAsk(q)}>{q}<ArrowUpRight size={15} /></button>)}</div></section>
     </div></div>
   </>;
@@ -265,7 +321,7 @@ function DocumentsPage({ documents: records, vendors, bills, openDoc, openBill, 
     if (['needs_review', 'pending_review', 'failed', 'error'].includes(doc.status)) return true;
     const bill = bills.find(b => (b.docId && b.docId === doc.id) || (doc.billId && b.id && b.id === doc.billId));
     if (bill && ['approved', 'scheduled', 'rejected'].includes(bill.status)) return false;
-    return bill?.status === 'pending_review' || (!USE_LOCAL_API && doc.status === 'processed' && typeof doc.confidence === 'number' && doc.confidence < .8);
+    return bill?.status === 'pending_review' || (!USE_LOCAL_API && doc.status === 'processed' && !doc.review && typeof doc.confidence === 'number' && doc.confidence < .8);
   };
   const reviewCount = documents.filter(needsReview).length;
   const isProcessing = (doc: Document) => ['processing', 'uploaded', 'extracting', 'queued', 'pending'].includes(doc.status);
@@ -339,10 +395,37 @@ function Transactions({ notify, openDoc, canImport }: { notify: (text: string) =
   return <><PageHeading eyebrow="CARD TRANSACTIONS" title="Bring your spending into view." description={canImport ? 'Import your card statement. Each charge is categorized and matched to its receipt.' : 'Review card charges and their matched receipts.'} />{canImport && <section className="panel rule-form"><h2>Import a card statement</h2><p>{USE_MOCKS ? 'CSV import is available when the backend endpoint is connected.' : 'A CSV with Date, Description and Amount columns (Card is optional). Re-importing the same file never books a charge twice.'}</p><input aria-label="Transaction CSV" type="file" accept=".csv,text/csv" disabled={busy || USE_MOCKS || USE_LOCAL_API} onChange={async e => { const file = e.target.files?.[0]; if (!file) return; setBusy(true); try { const result = await api.importTransactions(file); notify(`${result.imported} imported · ${result.categorized} categorized · ${result.matchedReceipts} receipts matched`); await load(); } catch (err) { notify(message(err)); } finally { setBusy(false); e.target.value = ''; } }} /></section>}
     <section className="panel"><div className="panel-heading"><h2>Charges <span className="muted">({txns?.length ?? 0})</span></h2><span className="muted">{cents(total)} total</span></div>{loadError && <div className="alert">Couldn’t load charges: {loadError}</div>}{txns === undefined ? <div className="skeleton" /> : txns.length ? <div className="table-scroll"><table><thead><tr><th>Date</th><th>Merchant</th><th>Category</th><th>Amount</th><th>Receipt</th></tr></thead><tbody>{txns.map(t => <tr key={t.txnId}><td>{t.date}</td><td>{t.description}</td><td><small className="table-sub">{t.glAccount} · {t.glAccountName}</small>{t.categoryReason && <small className="table-sub">{t.categoryReason}</small>}</td><td>{cents(t.amount)}</td><td>{t.receiptDocumentId ? <button className="document-link" onClick={() => openDoc(t.receiptDocumentId!)}>Matched <ArrowUpRight size={13} /></button> : <span className="muted">No receipt yet</span>}</td></tr>)}</tbody></table></div> : <Empty text="No card charges yet. Import a statement to see them here." />}</section></>;
 }
-function DocumentRoute({ id }: { id: string }) { const [doc, setDoc] = useState<Document>(); const [vendors, setVendors] = useState<Vendor[]>([]); const [error, setError] = useState(''); useEffect(() => { let active = true; Promise.all([api.document(id), api.vendors()]).then(([d, v]) => { if (active) { setDoc(d); setVendors(v); } }).catch(e => { if (active) setError(message(e)); }); return () => { active = false; }; }, [id]); return error ? <div className="alert error">{error}</div> : doc ? <><PageHeading eyebrow="DOCUMENT DETAIL" title={doc.filename} description="Source document and extracted information, side by side." /><DocumentDetail doc={doc} vendors={vendors} /></> : <div className="skeleton" />; }
-function DocumentDetail({ doc, vendors }: { doc: Document; vendors: Vendor[] }) { const recognized = vendors.find(v => v.name === doc.vendorName && v.billCount > 1); return <div className="document-detail"><div className="preview">{doc.viewUrl ? doc.viewUrl.startsWith('blob:') && /\.(png|jpe?g)$/i.test(doc.filename) ? <img src={doc.viewUrl} alt={doc.filename} /> : <iframe title={`Preview of ${doc.filename}`} src={doc.viewUrl} /> : <Empty text="Preview is not available yet." />}</div><section className="extracted"><div className="eyebrow">{USE_LOCAL_API ? 'SOURCE METADATA' : 'EXTRACTED INFORMATION'}</div><h2>{doc.vendorName || label(doc.type)}</h2><div className="document-badges"><Pill status={doc.status} />{!USE_LOCAL_API && typeof doc.confidence === 'number' && <span className={`pill ${doc.confidence >= .8 ? 'processed' : 'pending_review'}`}>{Math.round(doc.confidence * 100)}% confidence</span>}</div>{recognized && <div className="recognized"><Check size={15} />Recognized vendor · {recognized.billCount} prior bills</div>}{!USE_LOCAL_API && typeof doc.confidence === 'number' && doc.confidence < .8 && <div className="alert">Low confidence. Operations should verify these fields before bill creation or approval.</div>}<dl>{Object.entries(doc.extracted ?? {}).map(([key, value]) => <div key={key}><dt>{label(key)}</dt><dd>{typeof value === 'object' ? JSON.stringify(value) : String(value)}</dd></div>)}</dl>{doc.viewUrl && <a className="document-link" href={doc.viewUrl} target="_blank" rel="noreferrer">Open original <ArrowUpRight size={14} /></a>}{USE_LOCAL_API && <small className="table-sub">D?s local server provides source metadata but no document previews.</small>}{USE_MOCKS && !USE_LOCAL_API && <small className="table-sub">Seed previews are fictional sample documents; uploaded previews show your file with simulated extracted fields.</small>}</section></div>; }
+function DocumentRoute({ id, role }: { id: string; role: Role }) { const [doc, setDoc] = useState<Document>(); const [vendors, setVendors] = useState<Vendor[]>([]); const [error, setError] = useState(''); useEffect(() => { let active = true; Promise.all([api.document(id), api.vendors()]).then(([d, v]) => { if (active) { setDoc(d); setVendors(v); } }).catch(e => { if (active) setError(message(e)); }); return () => { active = false; }; }, [id]); return error ? <div className="alert error">{error}</div> : doc ? <><PageHeading eyebrow="DOCUMENT DETAIL" title={doc.filename} description="Source document and extracted information, side by side." /><DocumentDetail doc={doc} vendors={vendors} role={role} /></> : <div className="skeleton" />; }
+// Needs-review documents without a bill are resolved by operations or the owner.
+function ResolveDocument({ doc, role, notify, onResolved }: { doc: Document; role?: Role; notify?: (text: string) => void; onResolved?: (doc: Document) => void }) {
+  const [note, setNote] = useState(''); const [busy, setBusy] = useState('');
+  const allowed = role === 'owner' || role === 'ops';
+  const resolve = async (resolution: 'accept' | 'dismiss') => { setBusy(resolution); try { const updated = await api.resolveDocument(doc.id, resolution, note.trim()); notify?.(resolution === 'accept' ? 'Marked as reviewed. The fields are confirmed.' : 'Dismissed. Kept in the library; nothing was posted.'); onResolved?.(updated); } catch (e) { notify?.(message(e)); } finally { setBusy(''); } };
+  return <div className="resolve-panel">
+    <strong>Finish the review</strong>
+    <p className="muted">{typeof doc.confidence === 'number' ? `The AI was ${Math.round(doc.confidence * 100)}% sure about this one. ` : ''}Compare the fields with the document, then close it out.</p>
+    {allowed ? <>
+      <textarea value={note} onChange={e => setNote(e.target.value)} rows={2} maxLength={500} placeholder="Note (optional), e.g. Duplicate of Maya's upload" aria-label="Review note" />
+      <div className="decision-buttons"><Button disabled={Boolean(busy)} onClick={() => void resolve('accept')}><Check size={15} />{busy === 'accept' ? 'Saving…' : 'Fields are correct'}</Button><Button variant="outline" disabled={Boolean(busy)} onClick={() => void resolve('dismiss')}>{busy === 'dismiss' ? 'Saving…' : 'Not a financial record'}</Button></div>
+    </> : <p className="muted">Document review is done by Operations or the owner. Partners approve bills.</p>}
+  </div>;
+}
+function DocumentDetail({ doc, vendors, role, notify, onResolved }: { doc: Document; vendors: Vendor[]; role?: Role; notify?: (text: string) => void; onResolved?: (doc: Document) => void }) { const recognized = vendors.find(v => v.name === doc.vendorName && v.billCount > 1); return <div className="document-detail"><div className="preview">{doc.viewUrl ? doc.viewUrl.startsWith('blob:') && /\.(png|jpe?g)$/i.test(doc.filename) ? <img src={doc.viewUrl} alt={doc.filename} /> : <iframe title={`Preview of ${doc.filename}`} src={doc.viewUrl} /> : <Empty text="Preview is not available yet." />}</div><section className="extracted"><div className="eyebrow">{USE_LOCAL_API ? 'SOURCE METADATA' : 'EXTRACTED INFORMATION'}</div><h2>{doc.vendorName || label(doc.type)}</h2><div className="document-badges"><Pill status={doc.status} />{!USE_LOCAL_API && typeof doc.confidence === 'number' && <span className={`pill ${doc.confidence >= .8 ? 'processed' : 'pending_review'}`}>{Math.round(doc.confidence * 100)}% confidence</span>}</div>{recognized && <div className="recognized"><Check size={15} />Recognized vendor · {recognized.billCount} prior bills</div>}{!USE_LOCAL_API && doc.status === 'needs_review' && !doc.billId ? <ResolveDocument doc={doc} role={role} notify={notify} onResolved={onResolved} /> : !USE_LOCAL_API && doc.status === 'needs_review' && typeof doc.confidence === 'number' && doc.confidence < .8 && <div className="alert">Low confidence. Operations should verify these fields before bill creation or approval.</div>}<dl>{Object.entries(doc.extracted ?? {}).map(([key, value]) => <div key={key}><dt>{label(key)}</dt><dd>{typeof value === 'object' ? JSON.stringify(value) : String(value)}</dd></div>)}</dl>{doc.viewUrl && <a className="document-link" href={doc.viewUrl} target="_blank" rel="noreferrer">Open original <ArrowUpRight size={14} /></a>}{USE_LOCAL_API && <small className="table-sub">D?s local server provides source metadata but no document previews.</small>}{USE_MOCKS && !USE_LOCAL_API && <small className="table-sub">Seed previews are fictional sample documents; uploaded previews show your file with simulated extracted fields.</small>}</section></div>; }
 
 const DONE_STATUSES = ['processed', 'completed', 'ready'];
+// No payout statement for the month yet: one thing to do (upload it), not one flag per revenue line.
+const statementMissing = (r: Reconciliation) => r.lines.length > 0 && r.actual === 0 && r.lines.every(l => !l.docId && !l.actual);
+const NEEDS_ATTENTION = ['needs_review', 'pending_review', 'failed', 'error', 'uploaded', 'extracting', 'processing'];
+// Bill statuses that mean the document's review is over; the document then shows the bill's status.
+const BILL_DECIDED = ['pending_approval', 'pending_docs', 'approved', 'scheduled', 'rejected'];
+function withBillStatus(documents: Document[], bills: Bill[]): Document[] {
+  return documents.map(doc => {
+    const id = doc.id || (doc as Document & { documentId?: string }).documentId;
+    const bill = bills.find(b => (b.docId && b.docId === id) || (doc.billId && b.id === doc.billId));
+    if (!bill || !BILL_DECIDED.includes(bill.status)) return doc;
+    return { ...doc, status: bill.status, vendorName: doc.vendorName || bill.vendor };
+  });
+}
 const STATUS_NOTES: Record<string, string> = { needs_review: 'Couldn’t read this one confidently. Take a look.', uploaded: 'Uploaded. Reading starts in a moment.', extracting: 'Reading the document…', failed: 'Processing failed. Try uploading it again.', error: 'Processing failed. Try uploading it again.' };
 function Intake({ documents, bills, openDoc, openBill }: { documents: Document[]; bills: Bill[]; openDoc: (id: string) => void; openBill: (id: string) => void }) {
   const reviewBills = bills.filter(b => b.status === 'pending_review');

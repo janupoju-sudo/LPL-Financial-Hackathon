@@ -43,6 +43,12 @@ export const api = {
   bills: () => USE_LOCAL_API ? Promise.resolve([] as Bill[]) : USE_MOCKS ? Promise.resolve(clone(bills)) : request<ApiBill[]>('/bills').then(list => list.map(normalizeBill)),
   vendors: () => USE_LOCAL_API ? Promise.resolve([] as Vendor[]) : USE_MOCKS ? Promise.resolve(clone(vendors)) : request<ApiVendor[]>('/vendors').then(list => list.map(normalizeVendor)),
   bill: (id: string): Promise<BillDetail> => { if (!USE_MOCKS && !USE_LOCAL_API) return request<ApiBill>(`/bills/${encodeURIComponent(id)}`).then(normalizeBillDetail); const bill = bills.find(b => b.id === id); return bill ? Promise.resolve({ ...clone(bill), audit: [] }) : Promise.reject(new Error('Bill not found')); },
+  // Close out a Needs-review document that has no bill: 'accept' = fields are right, 'dismiss' = not a financial record.
+  async resolveDocument(id: string, resolution: 'accept' | 'dismiss', note = ''): Promise<Document> {
+    if (!USE_MOCKS && !USE_LOCAL_API) { const doc = await request<ApiDocument>(`/documents/${encodeURIComponent(id)}/resolve`, { resolution, note }); changed(); return normalizeDocument(doc); }
+    const doc = documents.find(d => d.id === id); if (!doc) throw new Error('Document not found');
+    doc.status = resolution === 'accept' ? 'processed' : 'dismissed'; doc.review = { resolution, by: 'You', at: new Date().toISOString(), note }; changed(); return clone(doc);
+  },
   async confirmBill(id: string, review: BillReview) {
     if (USE_MOCKS || USE_LOCAL_API) throw new Error('Reviewing bills needs the live backend.');
     const result = await request<{ billId: string; status: string }>(`/bills/${encodeURIComponent(id)}/confirm`, review); changed(); return result;
