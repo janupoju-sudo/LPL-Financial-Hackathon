@@ -101,7 +101,7 @@ def pick_documents(question: str, documents, entries, period: str, drivers: list
     start, end = periods.parse(period)
     q = _tokens(question)
     driver_docs = {e["sourceDocId"] for e in entries
-                   if e.get("sourceDocId") and e["account"] in drivers
+                   if e.get("sourceDocId") and coa.category(e["account"]) in drivers  # sub-accounts count for their category
                    and start <= date.fromisoformat(e["date"]) <= end}
 
     scored = []
