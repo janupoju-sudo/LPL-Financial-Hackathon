@@ -405,3 +405,18 @@ def test_migration_unblocks_new_seed_without_duplicate_compliance(aws, monkeypat
         entries = _items("p1", f"LEDGER#2026-{month:02d}#")
         assert sum(line["debit"] for line in entries if line["account"] == "6600") == 565_000
     assert ddb.get_revenue_lines("p1", "2026-09") == []
+
+
+def test_reset_keeps_seeded_history_bills_and_clears_unmatched_card_imports(aws):
+    _seed_practice("p1")
+    repo.put_bill("p1", {"billId": "bill_seed_orn_2026_06", "vendorName": "Orion Software LLC",
+                         "amount": 450, "status": "scheduled", "seeded": True,
+                         "createdAt": "2026-06-02T14:00:00+00:00"})
+    ledger.post_journal("p1", "j-card-unmatched", "2026-09-12", ledger.card_spend_lines(42, "6710"),
+                        "Card: DELTA AIR 0062345", source_type="card", source_id="unmatched")
+
+    plan, _ = reset_demo.reset_demo("p1", execute=True)
+
+    assert [b["billId"] for b in repo.list_bills("p1")] == ["bill_seed_orn_2026_06"]
+    assert len(plan["seeded_bills"]) == 1
+    assert not [i for i in _items("p1", "LEDGER#") if i["journalId"] == "j-card-unmatched"]
