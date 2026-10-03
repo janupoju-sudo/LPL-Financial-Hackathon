@@ -185,7 +185,7 @@ nav { display: grid; gap: 4px; }
 .connected { display: flex; align-items: center; gap: 8px; padding: 10px 14px 0; font-size: 11.5px; color: var(--faint); }
 .status-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--ok); flex-shrink: 0; }
 .main-area { position: relative; z-index: 1; min-width: 0; margin-left: 284px; padding: 18px 18px 0 0; display: flex; flex-direction: column; min-height: 100dvh; }
-.topbar { position: sticky; top: 18px; z-index: 30; display: flex; align-items: center; gap: 10px; }
+.topbar { position: relative; z-index: 30; display: flex; align-items: center; gap: 10px; }
 .topbar-search { flex: 1; max-width: 460px; display: flex; align-items: center; gap: 10px; height: 46px; padding: 0 16px; border-radius: 16px; color: var(--muted); text-align: left; font-size: 13.5px; }
 .topbar-search:hover { background: var(--glass-strong); }
 .topbar-search kbd { margin-left: auto; font: 500 11.5px var(--mono); padding: 3px 7px; border-radius: 7px; background: var(--hover); color: var(--muted); }
@@ -294,7 +294,10 @@ a.kpi:hover { background: var(--glass-strong); }
 .revenue-kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; margin-bottom: 18px; }
 .revenue-kpis .kpi-label { justify-content: space-between; color: var(--muted); font-weight: 400; }
 .revenue-kpis .kpi-value { font-size: 26px; }
-.chart-panel .tabs { margin: 0 22px; }
+.chart-panel .tabs { margin: 0 22px; max-width: calc(100% - 44px); overflow-x: auto; scrollbar-width: none; }
+.tabs button { white-space: nowrap; flex-shrink: 0; }
+.statement-section h3 + .statement-row, .statement-section > .statement-total:only-child { border-top: 0; }
+.statement-total { font-weight: 600; }
 .tabs { display: inline-flex; gap: 4px; padding: 4px; border-radius: 999px; background: var(--hover); }
 .tabs button { height: 32px; padding: 0 14px; border-radius: 999px; color: var(--muted); font-size: 13px; }
 .tabs button:hover { color: var(--ink); }
@@ -470,7 +473,7 @@ a.kpi:hover { background: var(--glass-strong); }
   nav { display: flex; width: 100%; justify-content: space-around; }
   .nav-item { justify-content: center; width: 56px; padding: 0; }
   .main-area { margin-left: 0; padding: 12px 16px 96px; }
-  .topbar { top: 12px; }
+
   .topbar-search kbd, .profile-name, .profile-trigger > svg { display: none; }
   .content { padding-top: 18px; }
   h1 { font-size: 26px; }
