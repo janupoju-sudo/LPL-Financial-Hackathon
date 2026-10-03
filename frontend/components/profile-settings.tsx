@@ -1,11 +1,11 @@
 'use client';
 
 import { useEffect, useId, useRef, useState } from 'react';
-import { Moon, Settings, Sun, X } from 'lucide-react';
+import { LogOut, Moon, Settings, Sun, X } from 'lucide-react';
 
 const THEME_KEY = 'ledgerline-theme';
 
-export function ProfileSettings({ role, name = 'Maya Chen', compact = false }: { role: string; name?: string; compact?: boolean }) {
+export function ProfileSettings({ role, name = 'Maya Chen', compact = false, signOut }: { role: string; name?: string; compact?: boolean; signOut?: () => void }) {
   const initials = name.split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase();
   const dialog = useRef<HTMLDialogElement>(null);
   const titleId = useId();
@@ -47,6 +47,7 @@ export function ProfileSettings({ role, name = 'Maya Chen', compact = false }: {
       <h3 className="settings-section-title">Appearance</h3>
       <div className="theme-setting"><span className="theme-setting-icon">{dark ? <Moon size={20} /> : <Sun size={20} />}</span><div><strong>Dark mode</strong><p>A softer view for after hours.</p></div><button type="button" role="switch" aria-label="Dark mode" aria-checked={dark} className={`theme-switch ${dark ? 'enabled' : ''}`} onClick={toggleTheme}><span /></button></div>
       <p className="settings-note">Your appearance preference is saved in this browser.</p>
+      {signOut && <button type="button" className="settings-signout" onClick={() => { dialog.current?.close(); signOut(); }}><LogOut size={16} />Sign out</button>}
     </dialog>
   </>;
 }

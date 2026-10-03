@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@aws-amplify/ui-react": "^6.12.0",
+    "@paper-design/shaders-react": "^0.0.81",
     "@radix-ui/react-slot": "^1.1.0",
     "aws-amplify": "^6.15.0",
     "class-variance-authority": "^0.7.1",

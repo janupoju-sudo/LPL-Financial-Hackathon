@@ -16,6 +16,9 @@ import { FinancialStatement } from './financial-statements';
 import { Revenue } from './revenue-view';
 import { percent } from '@/lib/format';
 import { ProfileSettings } from './profile-settings';
+import { ShaderBg } from './shader-bg';
+import { OtterPeek } from './otter-peek';
+import { PressFeedback, RevealOnScroll } from './motion-effects';
 import { GoogleDriveImport } from './google-drive-import';
 import { canApproveBill, canImportTransactions, canManageRules, canReviewDocuments, canUploadDocuments } from '@/lib/permissions';
 import { Landing } from './landing';
@@ -26,7 +29,14 @@ import { OtterLogo, OtterMark } from './brand';
 const money = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n);
 function Amount({ value }: { value: number }) { const [whole, frac] = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value).split('.'); return <>{whole}<small>.{frac}</small></>; }
 const cents = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n);
-const label = (s?: string | null) => s ? s.replaceAll('_', ' ').replace(/\b\w/g, c => c.toUpperCase()) : '';
+const label = (s?: string | null) => s ? s.replace(/([a-z])([A-Z])/g, '$1 $2').replaceAll('_', ' ').replace(/\b\w/g, c => c.toUpperCase()) : '';
+// Extracted fields arrive as raw values: show line items as a list, confidences as %, amounts as money.
+function FieldValue({ name, value }: { name: string; value: unknown }) {
+  if (Array.isArray(value) && value.every(v => v && typeof v === 'object')) return <ul className="line-items">{(value as Record<string, unknown>[]).map((item, i) => <li key={i}><span>{String(item.description ?? item.name ?? `Item ${i + 1}`)}</span>{typeof item.amount === 'number' && <span className="mono">{cents(item.amount)}</span>}</li>)}</ul>;
+  if (typeof value === 'number' && /confidence/i.test(name) && value <= 1) return <>{Math.round(value * 100)}%</>;
+  if (typeof value === 'number' && /amount|total|subtotal|tax/i.test(name)) return <span className="mono">{cents(value)}</span>;
+  return <>{typeof value === 'object' && value !== null ? JSON.stringify(value) : String(value)}</>;
+}
 // Four places. Money out and Documents each hold a few pages, shown as tabs inside the place.
 const nav = [
   { name: 'Home', path: '/', icon: Home, match: ['/'] },
@@ -46,9 +56,9 @@ const authConfigured = Boolean(process.env.NEXT_PUBLIC_COGNITO_USER_POOL_ID && p
 if (authConfigured) Amplify.configure({ Auth: { Cognito: { userPoolId: process.env.NEXT_PUBLIC_COGNITO_USER_POOL_ID!, userPoolClientId: process.env.NEXT_PUBLIC_COGNITO_CLIENT_ID! } } });
 
 export function Workspace() {
-  if (USE_MOCKS || USE_LOCAL_API) return <MotionConfig reducedMotion="user"><MockGate /></MotionConfig>;
+  if (USE_MOCKS || USE_LOCAL_API) return <MotionConfig reducedMotion="user"><PressFeedback /><MockGate /></MotionConfig>;
   if (!authConfigured) return <main className="login"><OtterMark size={40} /><h1>Connect your practice</h1><p>Set the Cognito user pool and client ID in frontend/.env.local to enable secure sign-in.</p></main>;
-  return <MotionConfig reducedMotion="user"><Authenticator.Provider><AuthGate /></Authenticator.Provider></MotionConfig>;
+  return <MotionConfig reducedMotion="user"><PressFeedback /><Authenticator.Provider><AuthGate /></Authenticator.Provider></MotionConfig>;
 }
 
 // Signed-out pages. The landing page and wizard are a demo of onboarding: no account is created
@@ -94,10 +104,10 @@ function SignIn({ onHome, onSignup }: { onHome: () => void; onSignup: () => void
     return () => clearInterval(timer);
   }, []);
   const components = useMemo(() => ({
-    Header: () => <div className="signin-head"><button type="button" onClick={onHome} aria-label="Back to the Otter home page"><OtterLogo height={30} /></button></div>,
+    Header: () => <div className="signin-head"><button type="button" onClick={onHome} aria-label="Back to the Otter home page"><OtterLogo height={30} /></button><div className="signin-otter"><OtterPeek size={80} right={36} /></div></div>,
     Footer: () => <p className="signin-foot">New to Otter? <button type="button" onClick={onSignup}>Set up your practice</button></p>,
   }), [onHome, onSignup]);
-  return <Authenticator hideSignUp components={components} formFields={SIGN_IN_FIELDS} />;
+  return <div className="signin-shell"><ShaderBg animated /><Authenticator hideSignUp components={components} formFields={SIGN_IN_FIELDS} /></div>;
 }
 
 function App({ signOut }: { signOut?: () => void }) {
@@ -174,18 +184,18 @@ function App({ signOut }: { signOut?: () => void }) {
     { group: 'Actions', label: `Export the ${period} package`, icon: ArrowDownToLine, run: () => void exportPackage() },
     { group: 'Actions', label: 'Switch light / dark mode', icon: Moon, run: toggleTheme },
     ...bills.filter(b => (b.status === 'pending_review' && canReview) || (b.status === 'pending_approval' && canApprove(b, role, userId))).map(b => ({ group: 'Waiting on you', label: `${b.status === 'pending_review' ? 'Review' : 'Approve'} ${b.vendor || 'bill'} · ${money(b.amount)}`, icon: Wallet, run: () => b.status === 'pending_review' ? void openBill(b.id) : router.push('/bills') })),
-    ...ASK_SUGGESTIONS.map(q => ({ group: 'Ask your books', label: q, icon: Sparkles, run: () => openAsk(q) })),
+    ...ASK_SUGGESTIONS.map(q => ({ group: 'Ask Otter', label: q, icon: Sparkles, run: () => openAsk(q) })),
     ...nav.map(n => ({ group: 'Go to', label: n.name, icon: n.icon, hint: n.path, run: () => router.push(n.path) })),
     ...SUBNAV.flat().filter(n => n.path !== '/rules' || (roleLoaded && canManageRules(role))).map(n => ({ group: 'Go to', label: n.name, icon: n.icon, hint: n.path, run: () => router.push(n.path) })),
     ...docs.slice(0, 60).map(d => ({ group: 'Documents', label: d.filename, icon: FileText, hint: d.vendorName, run: () => void openDoc(d.id) })),
   ], [bills, docs, period, openAsk, router, canUpload, canReview, role, roleLoaded, userId, exportPackage, openBill, openDoc]);
   return <div className="app-shell">
-    <div className="backdrop" aria-hidden="true"><i /><i /><i /></div>
+    <ShaderBg />
+    <RevealOnScroll path={path} />
     <aside className="sidebar">
       <Link className="brand" href="/"><span className="brand-icon otter"><OtterMark size={30} /></span><span><strong>Otter</strong><small>Harbor Point Wealth</small></span></Link>
       <nav aria-label="Main">{nav.map(item => { const active = isActive(item.match, path); const count = counts[item.path] ?? 0; return <Link className={`nav-item ${active ? 'active' : ''}`} aria-current={active ? 'page' : undefined} href={item.path} key={item.path}><item.icon size={19} /><span>{item.name}</span>{count > 0 && <span className="nav-count" aria-label={`${count} need attention`}>{count}</span>}</Link>; })}</nav>
       <div className="sidebar-bottom">
-        <button className="side-link" onClick={() => openAsk()}><Sparkles size={18} />Ask your books</button>
         {roleLoaded && canManageRules(role) && <Link className={`side-link ${path === '/rules' ? 'active' : ''}`} href="/rules"><SlidersHorizontal size={18} />Rules</Link>}
         {signOut && <button className="side-link" onClick={signOut}><LogOut size={18} />Sign out</button>}
       </div>
@@ -193,8 +203,8 @@ function App({ signOut }: { signOut?: () => void }) {
     <div className="main-area"><header className="topbar">
         <button className="topbar-search" onClick={() => setPalette(true)} aria-label="Search, ask or jump to a page"><Search size={18} /><span>Search, ask, or jump…</span><kbd>⌘K</kbd></button>
         <div className="topbar-right">
-          {canUpload && <Link className="icon-button" href="/documents?upload=1" aria-label="Upload a document" title="Upload a document"><Plus size={19} /></Link>}
-          <div className="topbar-chip"><ProfileSettings name={userName} role={label(role)} /></div></div></header>
+          {canUpload && !path.startsWith('/documents') && <Link className="icon-button" href="/documents?upload=1" aria-label="Upload a document" title="Upload a document"><Plus size={19} /></Link>}
+          <div className="topbar-chip"><ProfileSettings name={userName} role={label(role)} signOut={signOut} /></div></div></header>
       <main className="content">{USE_LOCAL_API && <div className="alert">Local sample data: financials, reconciliation, Ask and export use D’s server. Uploads and approvals are unavailable.</div>}
         {error && <div role="alert" className="alert error">{error}<Button variant="outline" onClick={() => { setLoading(true); void refresh(); }}>Retry</Button></div>}
         {subnav && <nav className="subnav" aria-label="Section">{subnav.map(item => <Link key={item.path} href={item.path} className={path === item.path ? 'active' : ''} aria-current={path === item.path ? 'page' : undefined}><item.icon size={15} />{item.name}</Link>)}</nav>}
@@ -211,9 +221,9 @@ function App({ signOut }: { signOut?: () => void }) {
         <footer className="footer"><span><ShieldCheck size={13} /> {USE_MOCKS ? 'Sample workspace · fictional data' : 'Secure practice workspace'}</span><span>Made for the business behind your advice.</span></footer>
       </main>
     </div>
-    {!askOpen && <button className="ask-fab" onClick={() => openAsk()} aria-label="Ask your books"><Sparkles size={18} />Ask</button>}
-    <aside className={`ask-panel ${askOpen ? 'open' : ''}`} aria-label="Ask your books" aria-hidden={!askOpen} inert={!askOpen}>
-      <div className="ask-panel-heading"><h2><Sparkles size={17} />Ask your books</h2><button aria-label="Close Ask" onClick={() => setAskOpen(false)}><X size={18} /></button></div>
+    {!askOpen && <button className="ask-fab" onClick={() => openAsk()} aria-label="Ask Otter"><Sparkles size={18} />Ask</button>}
+    <aside className={`ask-panel ${askOpen ? 'open' : ''}`} aria-label="Ask Otter" aria-hidden={!askOpen} inert={!askOpen}>
+      <div className="ask-panel-heading"><h2><Sparkles size={17} />Ask Otter</h2><button aria-label="Close Ask" onClick={() => setAskOpen(false)}><X size={18} /></button></div>
       <Ask openDoc={openDoc} request={askRequest} />
     </aside>
     {palette && <CommandPalette commands={commands} onClose={() => setPalette(false)} onAsk={q => openAsk(q)} />}
@@ -232,7 +242,7 @@ type Command = { group: string; label: string; icon: React.ComponentType<{ size?
 function CommandPalette({ commands, onClose, onAsk }: { commands: Command[]; onClose: () => void; onAsk: (q: string) => void }) {
   const [query, setQuery] = useState(''); const [sel, setSel] = useState(0); const list = useRef<HTMLUListElement>(null);
   const q = query.trim();
-  const shown = useMemo<Command[]>(() => { const matches = commands.filter(c => `${c.label} ${c.hint ?? ''}`.toLowerCase().includes(q.toLowerCase())).slice(0, 30); return q ? [...matches, { group: 'Ask your books', label: `Ask: “${q}”`, icon: Sparkles, run: () => onAsk(q) }] : matches; }, [commands, q, onAsk]);
+  const shown = useMemo<Command[]>(() => { const matches = commands.filter(c => `${c.label} ${c.hint ?? ''}`.toLowerCase().includes(q.toLowerCase())).slice(0, 30); return q ? [...matches, { group: 'Ask Otter', label: `Ask: “${q}”`, icon: Sparkles, run: () => onAsk(q) }] : matches; }, [commands, q, onAsk]);
   useEffect(() => { list.current?.querySelector('.selected')?.scrollIntoView({ block: 'nearest' }); }, [sel]);
   const run = (c?: Command) => { if (!c) return; onClose(); c.run(); };
   const onKey = (e: React.KeyboardEvent) => {
@@ -276,13 +286,13 @@ function Dashboard({ userName, userId, role, canUpload, canReview, data, bills, 
       <section className="panel hero-card"><div className="hero-top"><span className="label">Est. practice value <span title={data.valuation.method}><CircleHelp size={14} /></span></span><span className="chip">{USE_MOCKS ? 'Sample data' : 'Built on recurring revenue'}</span></div>
         <div className="hero-num"><span><Amount value={data.valuation.mid} /></span><span className="delta up">{percent(data.kpis.recurringPct)} recurring</span></div>
         <p className="hero-sub">{money(data.valuation.low)} – {money(data.valuation.high)} estimated range</p>
-        <div className="hero-actions">{canUpload && <Link className="button primary" href="/documents?upload=1"><ArrowUp size={16} />Upload document</Link>}<Link className="button outline" href="/bills"><Check size={16} />Review bills{pending.length ? ` (${pending.length})` : ''}</Link><Button variant="outline" disabled={exporting} onClick={exportPackage}><ArrowDownToLine size={16} />{exporting ? 'Preparing…' : 'Export package'}</Button><Button variant="outline" onClick={() => openAsk()}><Sparkles size={16} />Ask your books</Button></div></section>
+        <div className="hero-actions">{canUpload && <Link className="button primary" href="/documents?upload=1"><ArrowUp size={16} />Upload document</Link>}<Link className="button outline" href="/bills"><Check size={16} />Review bills{pending.length ? ` (${pending.length})` : ''}</Link><Button variant="outline" disabled={exporting} onClick={exportPackage}><ArrowDownToLine size={16} />{exporting ? 'Preparing…' : 'Export package'}</Button><Button variant="outline" onClick={() => openAsk()}><Sparkles size={16} />Ask Otter</Button></div></section>
       <div className="mini-grid"><Kpi label="Money in" tone="in" icon={<ArrowDown size={16} />} href="/revenue" value={<Amount value={data.pnl.totalRevenue} />} note="Revenue for the period" /><Kpi label="Money out" tone="out" icon={<ArrowUp size={16} />} href="/bills" value={<Amount value={data.pnl.totalExpenses} />} note="Expenses for the period" /><Kpi label="Operating margin" icon={<Wallet size={16} />} value={percent(data.kpis.margin)} note={marginDelta === null ? `${money(data.pnl.operatingIncome)} operating income` : `${marginDelta >= 0 ? '+' : ''}${marginDelta.toFixed(1)} pts vs ${data.kpis.previous.period}`} /></div>
       <section className="panel chart-panel"><div className="panel-heading"><div><h2>Financial statements</h2><p>Income statement, balance sheet and cash flow for the selected period.</p></div><span className="muted">USD</span></div><div className="tabs" role="tablist">{['Income statement', 'Balance sheet', 'Cash flow'].map(name => <button role="tab" aria-selected={tab === name} className={tab === name ? 'selected' : ''} key={name} onClick={() => setTab(name)}>{name}</button>)}</div>{tab === 'Income statement' ? <>{data.monthly?.length ? <><div className="chart-legend"><span><i className="green" /> Revenue</span><span><i className="gray" /> Expenses</span><span className="chart-period">Last {data.monthly.length} months</span></div><div className="chart"><ResponsiveContainer width="100%" height="100%"><AreaChart data={data.monthly} margin={{ top: 16, right: 16, left: 4, bottom: 0 }}><defs><linearGradient id="revFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="var(--chart-1)" stopOpacity={.12} /><stop offset="100%" stopColor="var(--chart-1)" stopOpacity={0} /></linearGradient><linearGradient id="expFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="var(--chart-2)" stopOpacity={.28} /><stop offset="100%" stopColor="var(--accent)" stopOpacity={0} /></linearGradient></defs><CartesianGrid vertical={false} stroke="var(--chart-grid)" /><XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: 'var(--muted)' }} dy={10} /><YAxis axisLine={false} tickLine={false} width={56} tickFormatter={v => `$${Math.round(v / 1000)}k`} tick={{ fontSize: 11, fill: 'var(--faint)' }} /><Tooltip formatter={value => money(Number(value))} contentStyle={{ background: 'var(--surface)', borderColor: 'var(--line)', color: 'var(--ink)', borderRadius: 8, fontSize: 12 }} itemStyle={{ color: 'var(--ink)' }} cursor={{ stroke: 'var(--line-strong)' }} /><Area type="monotone" dataKey="revenue" name="Revenue" stroke="var(--chart-1)" strokeWidth={2} fill="url(#revFill)" dot={false} activeDot={{ r: 4 }} /><Area type="monotone" dataKey="expenses" name="Expenses" stroke="var(--chart-2)" strokeWidth={2} fill="url(#expFill)" dot={false} activeDot={{ r: 4 }} /></AreaChart></ResponsiveContainer></div></> : <><div className="chart-legend"><span><i className="green" /> Revenue</span><span><i className="gray" /> Expenses</span><span className="chart-period">Selected period totals</span></div><div className="chart"><ResponsiveContainer width="100%" height="100%"><BarChart data={[{ name: 'Revenue', amount: data.pnl.totalRevenue }, { name: 'Expenses', amount: data.pnl.totalExpenses }, { name: 'Operating income', amount: data.pnl.operatingIncome }]} margin={{ top: 15, right: 12, left: 4, bottom: 0 }}><CartesianGrid vertical={false} stroke="var(--chart-grid)" /><XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: 'var(--muted)' }} dy={10} /><YAxis axisLine={false} tickLine={false} width={56} tickFormatter={v => `$${Math.round(v / 1000)}k`} tick={{ fontSize: 11, fill: 'var(--faint)' }} /><Tooltip formatter={value => money(Number(value))} contentStyle={{ background: 'var(--surface)', borderColor: 'var(--line)', color: 'var(--ink)', borderRadius: 8, fontSize: 12 }} itemStyle={{ color: 'var(--ink)' }} cursor={{ fill: 'var(--hover)' }} /><Bar dataKey="amount" name="Amount" radius={[5, 5, 0, 0]} maxBarSize={56}><Cell fill="var(--chart-1)" /><Cell fill="var(--chart-2)" /><Cell fill="var(--faint)" /></Bar></BarChart></ResponsiveContainer></div></>}<FinancialStatement data={data} tab={tab} /><div className="chart-bottom"><span>Operating income <strong>{money(data.pnl.operatingIncome)}</strong></span><button onClick={() => openAsk()}>Explore your numbers <ArrowRight size={14} /></button></div></> : <FinancialStatement data={data} tab={tab} />}</section>
       <section className="panel recent-panel"><div className="panel-heading"><div><h2>Recent bills</h2><p>The latest in your back office.</p></div><Link href="/bills">View all</Link></div><div className="table-scroll"><table><thead><tr><th>Vendor</th><th>Category</th><th>Amount</th><th>Status</th></tr></thead><tbody>{bills.slice(0, 4).map(b => <tr key={b.id}><td><span className="vendor-cell"><span className="vendor-avatar">{b.vendor.slice(0, 2).toUpperCase()}</span>{b.vendor}</span></td><td className="muted">{b.glAccount.split('·')[1] ?? b.glAccount}</td><td className="amount">{cents(b.amount)}</td><td><Pill status={b.status} /></td></tr>)}</tbody></table></div></section>
     </div><div className="home-side">
       <section className="panel attention-panel"><div className="panel-heading"><div><h2>Waiting on you</h2><p>A little action goes a long way.</p></div><span className="count-bubble">{pending.length + revenueItems}</span></div><div className="queue">{pending.slice(0, 3).map(bill => bill.status === 'pending_review' ? <button className="attention-item" key={bill.id} onClick={() => openBill(bill.id)}><span className="attention-icon amber"><FileText size={17} /></span><div><strong>{bill.vendor || 'Unknown vendor'}</strong><p>Review extracted fields <i>·</i> {money(bill.amount)}</p></div><ArrowRight size={15} /></button> : <button className="attention-item" key={bill.id} onClick={() => openBill(bill.id)}><span className="attention-icon amber"><Wallet size={17} /></span><div><strong>{bill.vendor}</strong><p>{canApprove(bill, role, userId) ? 'Awaiting your approval' : `Pending ${approverNames(bill)} approval`} <i>·</i> {money(bill.amount)}</p>{bill.ruleHits[0] && <small>{bill.ruleHits[0]}</small>}</div><ArrowRight size={15} /></button>)}{!revenueItems ? null : revenue && statementMissing(revenue) ? <Link className="attention-item" href="/revenue"><span className="attention-icon coral"><ArrowDown size={17} /></span><div><strong>Payout statement not uploaded</strong><small>Upload this month’s LPL statement to reconcile {money(revenue.expected)} of expected revenue.</small></div><ArrowRight size={15} /></Link> : revenue?.flags.map(flag => <Link className="attention-item" href="/revenue" key={flag.lineId}><span className="attention-icon coral"><ArrowDown size={17} /></span><div><strong>{revenue.lines.find(line => line.id === flag.lineId)?.label ?? 'Revenue variance'}</strong><small className={flag.severity === 'high' ? 'text-red' : ''}>{flag.message}</small></div><ArrowRight size={15} /></Link>)}{pending.length === 0 && !revenueItems && <Empty text="You're all caught up." />}</div><Link href="/bills" className="panel-bottom-link">View all bills <ArrowRight size={14} /></Link></section>
-      <section className="insight-card"><span className="insight-icon"><Sparkles size={19} /></span><h2>Ask your books</h2><p>Answers grounded in your documents, with sources.</p><div className="suggestions">{ASK_SUGGESTIONS.map(q => <button key={q} className="suggestion" onClick={() => openAsk(q)}>{q}<ArrowUpRight size={15} /></button>)}</div></section>
+      <section className="insight-card"><span className="insight-icon"><Sparkles size={19} /></span><h2>Ask Otter</h2><p>Answers grounded in your documents, with sources.</p><div className="suggestions">{ASK_SUGGESTIONS.map(q => <button key={q} className="suggestion" onClick={() => openAsk(q)}>{q}<ArrowUpRight size={15} /></button>)}</div></section>
     </div></div>
   </>;
 }
@@ -404,7 +414,7 @@ function ResolveDocument({ doc, role, notify, onResolved }: { doc: Document; rol
     </> : <p className="muted">Document review is done by Operations or the owner. Partners approve bills.</p>}
   </div>;
 }
-function DocumentDetail({ doc, vendors, role, notify, onResolved }: { doc: Document; vendors: Vendor[]; role?: Role; notify?: (text: string) => void; onResolved?: (doc: Document) => void }) { const recognized = vendors.find(v => v.name === doc.vendorName && v.billCount > 1); return <div className="document-detail"><div className="preview">{doc.viewUrl ? doc.viewUrl.startsWith('blob:') && /\.(png|jpe?g)$/i.test(doc.filename) ? <img src={doc.viewUrl} alt={doc.filename} /> : <iframe title={`Preview of ${doc.filename}`} src={doc.viewUrl} /> : <Empty text="Preview is not available yet." />}</div><section className="extracted"><div className="eyebrow">{USE_LOCAL_API ? 'SOURCE METADATA' : 'EXTRACTED INFORMATION'}</div><h2>{doc.vendorName || label(doc.type)}</h2><div className="document-badges"><Pill status={doc.status} />{!USE_LOCAL_API && typeof doc.confidence === 'number' && <span className={`pill ${doc.confidence >= .8 ? 'processed' : 'pending_review'}`}>{Math.round(doc.confidence * 100)}% confidence</span>}</div>{recognized && <div className="recognized"><Check size={15} />Recognized vendor · {recognized.billCount} prior bills</div>}{!USE_LOCAL_API && doc.status === 'needs_review' && !doc.billId ? <ResolveDocument doc={doc} role={role} notify={notify} onResolved={onResolved} /> : !USE_LOCAL_API && doc.status === 'needs_review' && typeof doc.confidence === 'number' && doc.confidence < .8 && <div className="alert">Low confidence. Operations should verify these fields before bill creation or approval.</div>}<dl>{Object.entries(doc.extracted ?? {}).map(([key, value]) => <div key={key}><dt>{label(key)}</dt><dd>{typeof value === 'object' ? JSON.stringify(value) : String(value)}</dd></div>)}</dl>{doc.viewUrl && <a className="document-link" href={doc.viewUrl} target="_blank" rel="noreferrer">Open original <ArrowUpRight size={14} /></a>}{USE_LOCAL_API && <small className="table-sub">D?s local server provides source metadata but no document previews.</small>}{USE_MOCKS && !USE_LOCAL_API && <small className="table-sub">Seed previews are fictional sample documents; uploaded previews show your file with simulated extracted fields.</small>}</section></div>; }
+function DocumentDetail({ doc, vendors, role, notify, onResolved }: { doc: Document; vendors: Vendor[]; role?: Role; notify?: (text: string) => void; onResolved?: (doc: Document) => void }) { const recognized = vendors.find(v => v.name === doc.vendorName && v.billCount > 1); return <div className="document-detail"><div className="preview">{doc.viewUrl ? doc.viewUrl.startsWith('blob:') && /\.(png|jpe?g)$/i.test(doc.filename) ? <img src={doc.viewUrl} alt={doc.filename} /> : <iframe title={`Preview of ${doc.filename}`} src={doc.viewUrl} /> : <Empty text="Preview is not available yet." />}</div><section className="extracted"><div className="eyebrow">{USE_LOCAL_API ? 'SOURCE METADATA' : 'EXTRACTED INFORMATION'}</div><h2>{doc.vendorName || label(doc.type)}</h2><div className="document-badges"><Pill status={doc.status} />{!USE_LOCAL_API && typeof doc.confidence === 'number' && <span className={`pill ${doc.confidence >= .8 ? 'processed' : 'pending_review'}`}>{Math.round(doc.confidence * 100)}% confidence</span>}</div>{recognized && <div className="recognized"><Check size={15} />Recognized vendor · {recognized.billCount} prior bills</div>}{!USE_LOCAL_API && doc.status === 'needs_review' && !doc.billId ? <ResolveDocument doc={doc} role={role} notify={notify} onResolved={onResolved} /> : !USE_LOCAL_API && doc.status === 'needs_review' && typeof doc.confidence === 'number' && doc.confidence < .8 && <div className="alert">Low confidence. Operations should verify these fields before bill creation or approval.</div>}<dl>{Object.entries(doc.extracted ?? {}).map(([key, value]) => <div key={key}><dt>{label(key)}</dt><dd><FieldValue name={key} value={value} /></dd></div>)}</dl>{doc.viewUrl && <a className="document-link" href={doc.viewUrl} target="_blank" rel="noreferrer">Open original <ArrowUpRight size={14} /></a>}{USE_LOCAL_API && <small className="table-sub">D?s local server provides source metadata but no document previews.</small>}{USE_MOCKS && !USE_LOCAL_API && <small className="table-sub">Seed previews are fictional sample documents; uploaded previews show your file with simulated extracted fields.</small>}</section></div>; }
 
 const DONE_STATUSES = ['processed', 'completed', 'ready'];
 // No payout statement for the month yet: one thing to do (upload it), not one flag per revenue line.
@@ -513,6 +523,6 @@ function BillDrawer({ bill, role, userId, busy: deciding, onDecide, onClose, onC
         </div>}
       </div>
     </div>
-    <h3 className="audit-heading">History</h3>{bill.audit.length ? <ol className="audit-trail">{bill.audit.map((a, i) => <li key={i}><div><strong>{label(a.action)}</strong> <span className="muted">by {a.actor}</span></div><small className="muted">{new Date(a.at).toLocaleString()}</small>{a.detail && <p>{a.detail}</p>}</li>)}</ol> : <p className="muted">No history recorded yet.</p>}
+    <h3 className="audit-heading">History</h3>{bill.audit.length ? <ol className="audit-trail">{bill.audit.map((a, i) => <li key={i}><div><strong>{label(a.action)}</strong> <span className="muted">by {a.actor.replace('Ledgerline', 'Otter')}</span></div><small className="muted">{new Date(a.at).toLocaleString()}</small>{a.detail && <p>{a.detail}</p>}</li>)}</ol> : <p className="muted">No history recorded yet.</p>}
   </section></div>;
 }
