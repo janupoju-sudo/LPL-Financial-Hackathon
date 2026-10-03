@@ -22,7 +22,7 @@ export function PracticeStep({ answers, update }: StepProps) {
         <Field label="Your name"><input value={answers.yourName} onChange={e => update({ yourName: e.target.value })} placeholder="First and last name" /></Field>
         <Field label="Work email" hint="You'll sign in with this."><input type="email" value={answers.email} onChange={e => update({ email: e.target.value })} placeholder="you@practice.com" /></Field>
       </div>
-      <Item variants={fadeUp} className="ob-note"><Building2 size={16} />Affiliated with LPL Financial. Your books stay separate from every other practice.</Item>
+      <Item variants={fadeUp} className="ob-note"><Building2 size={16} />Your books are private and stay separate from every other practice.</Item>
     </motion.div>
   );
 }
@@ -127,7 +127,7 @@ export function RulesStep({ answers, update }: StepProps) {
   );
 }
 
-const SAMPLE_FILES = ['Orion Software invoice.pdf', 'Seaport lease – October.pdf', 'LPL payout – September.pdf'];
+const SAMPLE_FILES = ['Orion Software invoice.pdf', 'Seaport lease – October.pdf', 'Payout statement – September.pdf'];
 
 export function DocumentsStep({ answers, update }: StepProps) {
   const [over, setOver] = useState(false);
