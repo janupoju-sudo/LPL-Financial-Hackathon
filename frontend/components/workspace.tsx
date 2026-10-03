@@ -4,10 +4,11 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Amplify } from 'aws-amplify';
-import { Authenticator } from '@aws-amplify/ui-react';
+import { Authenticator, useAuthenticator } from '@aws-amplify/ui-react';
+import { MotionConfig } from 'motion/react';
 import '@aws-amplify/ui-react/styles.css';
 import { Area, AreaChart, Bar, BarChart, Cell, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { ArrowDown, ArrowDownToLine, ArrowRight, ArrowUp, ArrowUpRight, BookOpen, Check, CircleHelp, CreditCard, FileText, FolderOpen, Home, LoaderCircle, LogOut, Moon, Plus, Search, Send, ShieldCheck, SlidersHorizontal, Sparkles, Trash2, UploadCloud, Wallet, X } from 'lucide-react';
+import { ArrowDown, ArrowDownToLine, ArrowRight, ArrowUp, ArrowUpRight, Check, CircleHelp, CreditCard, FileText, FolderOpen, Home, LoaderCircle, LogOut, Moon, Plus, Search, Send, ShieldCheck, SlidersHorizontal, Sparkles, Trash2, UploadCloud, Wallet, X } from 'lucide-react';
 import { api, subscribe, USE_MOCKS, USE_LOCAL_API } from '@/lib/api';
 import type { Answer, Bill, BillApprovalChanges, BillDetail, BillReview, CardTransaction, Document, Financials, Reconciliation, Role, Rule, RuleCondition, Vendor } from '@/lib/types';
 import { Button } from '@/components/ui/button';
@@ -15,6 +16,10 @@ import { FinancialStatement } from './financial-statements';
 import { Revenue } from './revenue-view';
 import { percent } from '@/lib/format';
 import { ProfileSettings } from './profile-settings';
+import { Landing } from './landing';
+import { OnboardingWizard } from './onboarding/wizard';
+import { LOGIN_PREFILL_KEY } from './onboarding/data';
+import { OtterLogo, OtterMark } from './brand';
 
 const money = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n);
 function Amount({ value }: { value: number }) { const [whole, frac] = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value).split('.'); return <>{whole}<small>.{frac}</small></>; }
@@ -39,9 +44,58 @@ const authConfigured = Boolean(process.env.NEXT_PUBLIC_COGNITO_USER_POOL_ID && p
 if (authConfigured) Amplify.configure({ Auth: { Cognito: { userPoolId: process.env.NEXT_PUBLIC_COGNITO_USER_POOL_ID!, userPoolClientId: process.env.NEXT_PUBLIC_COGNITO_CLIENT_ID! } } });
 
 export function Workspace() {
-  if (USE_MOCKS || USE_LOCAL_API) return <App />;
-  if (!authConfigured) return <main className="login"><BookOpen size={36} /><h1>Connect your practice</h1><p>Set the Cognito user pool and client ID in frontend/.env.local to enable secure sign-in.</p></main>;
-  return <Authenticator hideSignUp>{({ signOut }) => <App signOut={signOut} />}</Authenticator>;
+  if (USE_MOCKS || USE_LOCAL_API) return <MotionConfig reducedMotion="user"><MockGate /></MotionConfig>;
+  if (!authConfigured) return <main className="login"><OtterMark size={40} /><h1>Connect your practice</h1><p>Set the Cognito user pool and client ID in frontend/.env.local to enable secure sign-in.</p></main>;
+  return <MotionConfig reducedMotion="user"><Authenticator.Provider><AuthGate /></Authenticator.Provider></MotionConfig>;
+}
+
+// Signed-out pages. The landing page and wizard are a demo of onboarding: no account is created
+// (self-signup is off), the wizard ends at sign-in with the email filled in.
+const ENTRY_PATHS = ['/login', '/signup', '/welcome'];
+
+// Mock/local mode has no sign-in, so the landing page lives at /welcome and the app stays at /.
+function MockGate() {
+  const pathname = usePathname(); const router = useRouter();
+  if (pathname === '/welcome') return <Landing onStart={() => router.push('/signup')} onSignIn={() => router.push('/')} />;
+  if (pathname === '/signup') return <OnboardingWizard live={false} onFinish={() => router.push('/')} onSignIn={() => router.push('/')} onExit={() => router.push('/welcome')} />;
+  return <App />;
+}
+
+function AuthGate() {
+  const { authStatus, signOut } = useAuthenticator(ctx => [ctx.authStatus]);
+  const pathname = usePathname(); const router = useRouter();
+  const signedIn = authStatus === 'authenticated';
+  useEffect(() => { if (signedIn && ENTRY_PATHS.includes(pathname)) router.replace('/'); }, [signedIn, pathname, router]);
+  if (authStatus === 'configuring' || (signedIn && ENTRY_PATHS.includes(pathname))) return <div className="gate-loading" />;
+  if (signedIn) return <App signOut={signOut} />;
+  if (pathname === '/') return <Landing onStart={() => router.push('/signup')} onSignIn={() => router.push('/login')} />;
+  if (pathname === '/signup') return <OnboardingWizard live onFinish={email => { try { sessionStorage.setItem(LOGIN_PREFILL_KEY, email); } catch { /* prefill is optional */ } router.push('/login'); }} onSignIn={() => router.push('/login')} onExit={() => router.push('/')} />;
+  return <SignIn onHome={() => router.push('/')} onSignup={() => router.push('/signup')} />;
+}
+
+const SIGN_IN_FIELDS = { signIn: { username: { label: 'Email', placeholder: 'you@practice.com' } } };
+
+function SignIn({ onHome, onSignup }: { onHome: () => void; onSignup: () => void }) {
+  // Amplify's form has no prefill option, so set the email field the way typing would.
+  useEffect(() => {
+    let email = ''; try { email = sessionStorage.getItem(LOGIN_PREFILL_KEY) ?? ''; } catch { /* no prefill */ }
+    if (!email) return;
+    let tries = 0;
+    const timer = setInterval(() => {
+      const input = document.querySelector<HTMLInputElement>('[data-amplify-authenticator] input[name="username"]');
+      if (input || ++tries > 40) clearInterval(timer);
+      if (!input || input.value) return;
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(input, email);
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      document.querySelector<HTMLInputElement>('[data-amplify-authenticator] input[name="password"]')?.focus();
+    }, 50);
+    return () => clearInterval(timer);
+  }, []);
+  const components = useMemo(() => ({
+    Header: () => <div className="signin-head"><button type="button" onClick={onHome} aria-label="Back to the Otter home page"><OtterLogo height={30} /></button></div>,
+    Footer: () => <p className="signin-foot">New to Otter? <button type="button" onClick={onSignup}>Set up your practice</button></p>,
+  }), [onHome, onSignup]);
+  return <Authenticator hideSignUp components={components} formFields={SIGN_IN_FIELDS} />;
 }
 
 function App({ signOut }: { signOut?: () => void }) {
@@ -123,7 +177,7 @@ function App({ signOut }: { signOut?: () => void }) {
   return <div className="app-shell">
     <div className="backdrop" aria-hidden="true"><i /><i /><i /></div>
     <aside className="sidebar">
-      <Link className="brand" href="/"><span className="brand-icon"><BookOpen size={17} /></span><span><strong>Ledgerline</strong><small>Harbor Point Wealth</small></span></Link>
+      <Link className="brand" href="/"><span className="brand-icon otter"><OtterMark size={30} /></span><span><strong>Otter</strong><small>Harbor Point Wealth</small></span></Link>
       <nav aria-label="Main">{nav.map(item => { const active = isActive(item.match, path); const count = counts[item.path] ?? 0; return <Link className={`nav-item ${active ? 'active' : ''}`} aria-current={active ? 'page' : undefined} href={item.path} key={item.path}><item.icon size={19} /><span>{item.name}</span>{count > 0 && <span className="nav-count" aria-label={`${count} need attention`}>{count}</span>}</Link>; })}</nav>
       <div className="sidebar-bottom">
         <button className="side-link" onClick={() => openAsk()}><Sparkles size={18} />Ask your books</button>
