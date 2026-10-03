@@ -1,5 +1,46 @@
 # Ledgerline backend: API, workflows, ledger (role C)
 
+## Operations dashboard and nine-vendor demo seed (E5/E7)
+
+`template.yaml` includes an `OperationsDashboard` CloudWatch resource. The normal
+SAM deployment creates it and exports `OperationsDashboardName` and
+`OperationsDashboardUrl`. Its name includes the stack and region because
+CloudWatch dashboards are account-global. It displays the last three hours of
+HTTP API request/error/latency metrics, errors for every stack Lambda, key demo
+Lambda invocation/duration metrics, ingest and approval execution outcomes and
+duration, and DynamoDB read/write throttling. The body uses explicit stack
+resource references and 48 existing service metric series. It does not enable
+detailed API metrics, custom metrics, alarms, log queries, or CloudTrail.
+
+No data can mean no recent traffic; it is not a health check. Approval execution
+duration includes time waiting for a human. After the deployment owner updates
+the stack, open the dashboard output URL and run the coordinated demo to see
+real metrics. CloudTrail remains a separate part of E5; this change does not
+complete that work.
+
+`scripts/seed.py` now defines nine fictional vendors. It preserves the original
+four workflow names and Brightline's initial missing-document state. The
+compliance consultant matches the history seed, with four additional vendors
+covering technology, payroll, office supplies and travel. Repeated runs add
+missing vendors without changing existing vendor IDs, aliases, bank suffixes,
+onboarding flags or bill counts; additional user-created vendors are retained.
+
+For an existing demo practice, the live-account owner can coordinate and run:
+
+```bash
+cd backend
+python scripts/seed.py --table ledgerline-dev --practice p1 --vendors-only
+```
+
+This command writes vendor rows in the selected practice only. It does not
+rewrite META, rules, ledger history, documents or September payout data. A
+normal seed without `--vendors-only` retains its existing META/rule behavior.
+Do not run either against the shared AWS account without team coordination.
+
+Local checks: `python -m unittest discover -s backend/tests -p test_seed_vendors.py`
+and `python -m unittest discover -s backend/tests -p test_operations_dashboard.py`.
+With backend development dependencies installed, also run `cfn-lint backend/template.yaml`.
+
 Serverless on AWS: **API Gateway (HTTP API) + Lambda (Python 3.12) + DynamoDB + Step Functions + S3 Object Lock + EventBridge + Cognito**, all defined in `template.yaml` (AWS SAM).
 
 ## Deploy (from your Mac)
