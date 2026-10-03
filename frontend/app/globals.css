@@ -416,3 +416,4 @@ nav { display: grid; gap: 1px; }
   .footer { flex-direction: column; }
   .alert { flex-direction: column; align-items: flex-start; }
 }
+td.nowrap { white-space: nowrap; }
