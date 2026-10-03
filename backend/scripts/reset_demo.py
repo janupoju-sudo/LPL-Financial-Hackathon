@@ -38,6 +38,8 @@ def _is_demo_journal(line, bill_ids, document_ids):
         return True
     if line.get("sourceType") == "payout" and line.get("date", "").startswith("2026-09"):
         return True
+    if line.get("sourceType") == "card":
+        return True  # imported card charges: no seed creates them, so they're all rehearsal data
     return any(journal_id.startswith(f"j-{bill_id}-") for bill_id in bill_ids)
 
 
@@ -48,7 +50,10 @@ def build_reset_plan(practice_id):
 
     from shared import ddb, repo
 
-    bills = ddb.query_prefix(practice_id, "BILL#")
+    all_bills = ddb.query_prefix(practice_id, "BILL#")
+    # History bills from scripts/seed_bills.py carry seeded=True and are part of the baseline.
+    seeded_bills = [bill for bill in all_bills if bill.get("seeded")]
+    bills = [bill for bill in all_bills if not bill.get("seeded")]
     documents = ddb.query_prefix(practice_id, "DOC#")
     source_documents = [document for document in documents if _is_seed_source(document)]
     demo_documents = [document for document in documents if not _is_seed_source(document)]
@@ -66,6 +71,7 @@ def build_reset_plan(practice_id):
     return {
         "practice_id": practice_id,
         "bills": bills,
+        "seeded_bills": seeded_bills,
         "demo_documents": demo_documents,
         "source_documents": source_documents,
         "demo_ledger_lines": demo_ledger_lines,
@@ -83,7 +89,10 @@ def print_preview(plan):
     print(f"  Uploaded demo documents to delete: {len(plan['demo_documents'])}")
     print(f"  Related ledger lines to delete: {len(plan['demo_ledger_lines'])} "
           f"across {len(ledger_journals)} journals")
+    card_journals = {line.get("journalId") for line in plan["demo_ledger_lines"] if line.get("sourceType") == "card"}
+    print(f"    (of which imported card charges: {len(card_journals)} journals)")
     print(f"  September 2026 revenue lines to delete: {len(plan['september_revenue'])}")
+    print(f"  Seeded history bills to preserve: {len(plan.get('seeded_bills', []))}")
     print(f"  Supporting source documents to preserve: {len(plan['source_documents'])}")
     if plan["brightline"]:
         print("  Brightline Marketing: restore missing W-9/void-check state")

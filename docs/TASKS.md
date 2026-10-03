@@ -1,6 +1,6 @@
 # Ledgerline — Tasks
 
-**Status updated Oct 2, 2026 (verified against main, AWS and merged PRs).**
+**Status updated Oct 3, 2026 (verified against main, the live AWS stack and a live upload run).**
 
 **How to use:** put your initials in `[ ]` → `[AB]` when you start, and `[x]` when merged to `main`.
 Priority: **P0** = demo-critical · **P1** = only after P0 works · **P2** = pitch-only
@@ -56,13 +56,13 @@ Dependencies are noted as `← B3` (wait on, or mock, that task).
 - [x] B5. `match_vendor` Lambda: exact/alias → fuzzy match (e.g. `rapidfuzz`); set `defaultGlAccount` from history; create the vendor if new ← C3
 - [x] B6. Step Functions `IngestDocument` ASL: classify → branch → normalize → match → create Bill / RevenueLines → start `ApproveBill` ← C4
 - [x] B7. EventBridge rule: S3 `Object Created` in `uploads/` → start `IngestDocument` ← E3
-- [ ] B8. Test on **all seed docs** (E5); tune prompts until every demo doc extracts correctly — _ingest ran live once (PNG → needs_review); demo PDFs not yet uploaded live_
+- [x] B8. Test on **all seed docs** (E5); tune prompts until every demo doc extracts correctly — _live run Oct 3: Orion $450 auto-approved, Orion $1,850 → Raj approved, Brightline held → released by W-9 + void check, Sept payout → only the $412 trail flagged. Open: Brightline invoice read at 0% and a re-uploaded W-9 at 40% (same file read 95% earlier); both recovered via review_
 - [x] B9. Void check / W-9 → update vendor `hasVoidCheck`, `hasW9`, `bankLast4`
 
 **P1**
-- [ ] B10. Duplicate/suspicious vendor flag (same bank details, different vendor name)
+- [x] B10. Duplicate/suspicious vendor flag (same bank details, different vendor name) — _#42: review-only flag on shared bank last-four_
 - [x] B11. Receipt ↔ card transaction matching (amount + date + merchant) — _built into C11's import (amount + date window)_
-- [ ] B12. GL account suggestion with a reason string ("Matched prior invoices from this vendor")
+- [x] B12. GL account suggestion with a reason string ("Matched prior invoices from this vendor") — _#42; shown on bills as glAccountReason_
 
 ---
 
@@ -108,6 +108,11 @@ Dependencies are noted as `← B3` (wait on, or mock, that task).
 - [x] D7. Valuation: `recurring_revenue_ttm × multiple` (low/mid/high), adjusted by recurring %, margin and concentration; return the `method` text for a UI tooltip
 - [x] D8. Create the Bedrock Guardrail (deny investment advice, mask PII) ← E — _live, 7/7 checks pass (`scripts/check_guardrail.py`)_
 
+**Also done (D)**
+- [x] D11. General ledger with subledgers: expense categories split into sub-accounts (e.g. Travel → Airfare, Car rides, Ground transportation, Parking); income statement shows totals with breakdown and change vs last period; AI and card import code to sub-accounts (#46)
+- [x] D12. Re-coded live history to sub-accounts, totals unchanged (`scripts/migrate_subledgers.py`, #47)
+- [x] D13. Home shows income statement, balance sheet and cash flow; Money in shows one banner when a month's statement hasn't arrived (#48)
+
 **P1**
 - [x] D9. "Why did X change?" variance explainer: compare periods, top 3 drivers — _covered by Ask: compares the period with the previous one and names the biggest drivers_
 - [ ] D10. Peer benchmark card (static fictional benchmarks)
@@ -120,11 +125,11 @@ Dependencies are noted as `← B3` (wait on, or mock, that task).
 - [x] E2. Amplify Hosting connected to the repo (`frontend/`)
 - [x] E3. S3 documents bucket with **Object Lock** (governance mode for the demo) + EventBridge notifications on; exports bucket
 - [x] E4. Cognito user pool + groups `owner`, `partner`, `ops`, `lpl_bookkeeper`; demo users — _4 demo logins created; self-signup disabled_
-- [ ] E5. CloudTrail on; CloudWatch dashboard (nice screenshot for the AWS judges) — _CloudTrail is on (hackathon account trail); **CloudWatch dashboard not built**_
+- [x] E5. CloudTrail on; CloudWatch dashboard (nice screenshot for the AWS judges) — _CloudTrail is on (hackathon account trail); dashboard `ledgerline-dev-us-east-1-operations` deployed (#44)_
 
 **P0 — Data**
 - [x] E6. Fictional practice **"Harbor Point Wealth"** (4 people, ~$250M AUM, ~180 clients); fee schedule for expected revenue
-- [x] E7. `seed/seed_ddb.py`: 6 months of ledger history, 8–10 vendors, default rules — _12 months of history + Q3 margin drop; 5 vendors; 12 history bills via `seed_bills.py`; seeded live_
+- [x] E7. `seed/seed_ddb.py`: 6 months of ledger history, 8–10 vendors, default rules — _12 months of history + Q3 margin drop; 9 vendors (#44); 12 history bills via `seed_bills.py`; expense history on sub-accounts (#46/#47); seeded live_
 - [x] E8. `seed/generate_docs.py`: demo PDFs, all watermarked **"SAMPLE — FICTIONAL DATA"**
   - [x] 2 invoices from the **same vendor** (vendor memory demo), one over $1,000
   - [x] 1 invoice from a **new vendor** (missing W-9 → rule hit)
@@ -148,8 +153,8 @@ Dependencies are noted as `← B3` (wait on, or mock, that task).
 
 ## 🔗 Integration checkpoints
 - [x] **H2:** contract frozen; all mocks render in the UI; SAM deploys
-- [ ] **H6:** real upload → Bill appears in UI (A + B + C) — _**next up**: upload the Orion $450 invoice on the live site_
-- [ ] **H12:** 2nd invoice auto-matches vendor; approval → ledger; reconciliation flags (B + C + D)
+- [x] **H6:** real upload → Bill appears in UI (A + B + C) — _Oct 3 live run_
+- [x] **H12:** 2nd invoice auto-matches vendor; approval → ledger; reconciliation flags (B + C + D) — _Oct 3 live run: Orion recognized and coded 6310; Raj's approval posted and scheduled; $412 flagged_
 - [ ] **H16:** 🔒 **FEATURE FREEZE** — full demo runs end to end on real AWS
 - [ ] **H21:** backup video recorded; reset script works
 - [ ] **H23:** 3 timed rehearsals done; submitted

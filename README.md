@@ -40,7 +40,7 @@ Demo state is in browser memory and resets on reload. The fixture financial peri
 
 ## Connect the backend
 
-Copy `frontend/.env.example` to `frontend/.env.local`, set the API URL and Cognito pool/client IDs, and set `NEXT_PUBLIC_USE_MOCKS=false`. Restart the dev server. Live mode requires sign-in and uses the Cognito access token; the demo role switcher is disabled. Authorization must be enforced by the backend; hiding buttons is only a UI convenience.
+Copy `frontend/.env.example` to `frontend/.env.local`, set the API URL and Cognito pool/client IDs, and set `NEXT_PUBLIC_USE_MOCKS=false`. Restart the dev server. Live mode requires sign-in and sends the Cognito **ID token** (`Authorization: Bearer <ID token>`, not the access token); the demo role switcher is disabled. Authorization must be enforced by the backend; hiding buttons is only a UI convenience.
 
 Endpoint paths and request/response types are documented in [frontend/API.md](frontend/API.md). Provide CORS on API Gateway and the upload bucket for your frontend origin and the presigned PUT Content-Type header. Document detail must return a browser-readable presigned `viewUrl`. Set the Cognito app client to a public client without a client secret.
 
