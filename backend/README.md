@@ -126,6 +126,9 @@ All four Cognito roles can read the shared practice financials, bills and docume
 | POST | `/bills/{id}/decision` | `{decision: "approve"\|"reject", comment}` | owner or configured approver (Partner for partner-routed bills); uploader cannot approve; `{billId, status: "processing"}`; poll the bill for the final status |
 | POST | `/bills/{id}/confirm` | `{amount?, vendorName?\|vendorId?, glAccount?, dueDate?, invoiceNumber?, invoiceDate?}` | owner/ops; confirms low-confidence fields and starts workflow |
 | POST | `/bills/{id}/receive` | | owner/ops; marks received and resumes a held bill |
+| POST | `/documents/{id}/withdraw` | `{reason}` | Owner may withdraw any unlinked receipt/unknown document in review; Ops only their own. Retained S3 object is not deleted. |
+| POST | `/bills/{id}/withdraw` | `{reason}` | Original uploader (Owner/Ops) or Owner may withdraw unposted review/approval/held bills; waiting workflow is resumed as a withdrawal. |
+| POST | `/bills/{id}/void` | `{reason}` | Owner only; reverses posted accrual and mock-payment journals with new audited entries. Does not delete the original bill or ledger history. |
 | GET | `/rules` | | rules (defaults seeded on first call) |
 | POST | `/rules` | `{name, condition, action, approverRole?, priority?, reason?}` | owner only |
 | PATCH | `/rules/{id}` | e.g. `{"enabled": false}` | owner only |
@@ -136,6 +139,8 @@ All four Cognito roles can read the shared practice financials, bills and docume
 | POST | `/export` | `{period}` | `{downloadUrl, documents, ledgerLines, missing}`; `downloadUrl` valid 15 min (D) |
 
 Money in the API is **dollars**. Money in the ledger is **integer cents**.
+
+Document extraction and rule evaluation run under AWS service roles, not a human Cognito account. Human bill-field review is Owner/Ops and requires a different user than the uploader; routed approval is a separate Owner/Partner action and also blocks self-approval. Bills that match an auto-approval rule can still be posted by the workflow without a human approval step. The original uploader (Owner/Ops) may withdraw their own unposted bill; only the Owner may void after ledger posting.
 
 ## Role E demo seed modes
 
@@ -221,16 +226,17 @@ confirmation that workflows have stopped is still required.
    - Invoice / receipt: `{type, confidence, vendorConfidence, vendorName, amount, invoiceNumber, invoiceDate, dueDate, glAccount, lineItems:[{description, amount}]}`. Both confidences are 0–1; the bill uses the lower of overall and vendor confidence, so a vendor confidence below `0.8` routes to human review even when the total is clear.
    - W-9 / void check: `{type, confidence, vendorName, hasW9, hasVoidCheck, bankLast4}`. `hasW9` / `hasVoidCheck` are derived from the document type; `bankLast4` is the final four digits when present.
    - Payout statement: `{type, confidence, period, revenueLines:[{id, source, ref?, label, actual, docId}]}`. `source` is `advisory | commission | trail | other`; `ref` is present when a contract/product reference can be extracted.
-4. **Invoices/receipts → invoke `CreateBillFunction`** (ARN in outputs; the SAM state machine policy already grants this invocation) with:
+4. **Invoices → invoke `CreateBillFunction`** (ARN in outputs; the SAM state machine policy already grants this invocation) with:
    ```json
    {"practiceId":"p1","documentId":"doc_..","vendorId":"ven_..","vendorName":"Orion Software LLC",
     "amount":1850.00,"invoiceNumber":"INV-2041","invoiceDate":"2026-09-28","dueDate":"2026-10-28",
     "glAccount":"6300","lineItems":[...],"confidence":0.93}
    ```
    Pass `vendorId` if your matcher found one, otherwise just `vendorName` (exact/alias match, else auto-create). The vendor's `defaultGlAccount` is used when you omit `glAccount`. Returns `{billId, status, isDuplicate}`.
-5. **Vendor helpers** (`shared/repo.py`): `list_vendors`, `find_vendor_by_name`, `create_vendor`, `add_vendor_alias` (call this after a fuzzy match so next time it's exact; this is the "vendor memory").
-6. **W-9 / void check →** `repo.record_vendor_docs(practice_id, vendor_id, has_w9=True, has_void_check=True, bank_last4="6789", document_id=doc_id)`. This emits `VendorUpdated`, and any bills on hold for that vendor resume automatically. Both documents are required by the default vendor-doc rule; a bill remains held until both flags are true.
-7. **Payout statements** save actual payout lines and post the extracted totals to the ledger. The $412 expected-vs-actual shortfall is flagged by D's reconciliation endpoint; B does not create a separate ingest review item solely for a shortfall.
+5. **Receipts are not payables.** Finalize the receipt as `processed` when confidence is at least `0.8`; lower-confidence extraction goes to `needs_review`. If a matching card charge already exists, link the receipt to the closest unlinked charge with the same amount within five days. Card imports also match previously processed receipts.
+6. **Vendor helpers** (`shared/repo.py`): `list_vendors`, `find_vendor_by_name`, `create_vendor`, `add_vendor_alias` (call this after a fuzzy match so next time it's exact; this is the "vendor memory").
+7. **W-9 / void check →** `repo.record_vendor_docs(practice_id, vendor_id, has_w9=True, has_void_check=True, bank_last4="6789", document_id=doc_id)`. This emits `VendorUpdated`, and any bills on hold for that vendor resume automatically. Both documents are required by the default vendor-doc rule; a bill remains held until both flags are true.
+8. **Payout statements** save actual payout lines and post the extracted totals to the ledger. The $412 expected-vs-actual shortfall is flagged by D's reconciliation endpoint; B does not create a separate ingest review item solely for a shortfall.
 
 ## Contract for D (Financials), agreed format
 
@@ -248,7 +254,7 @@ confirmation that workflows have stopped is still required.
 ## Contract for A (Frontend)
 
 - Log in with Cognito (`UserPoolId`, `UserPoolClientId`); send the **ID token** as `Authorization: Bearer ...`. Role = Cognito group (`owner`, `partner`, `ops`, `lpl_bookkeeper`) for the role switcher.
-- Upload = `POST /documents/upload-url` → `PUT uploadUrl` with `Content-Type` → poll `GET /documents/{id}` until `billId` appears.
+- Upload = `POST /documents/upload-url` → `PUT uploadUrl` with `Content-Type` → poll `GET /documents/{id}` until processing completes. Invoices receive a `billId`; receipts do not create bills and may link to a card charge.
 - After `POST /bills/{id}/decision`, the status is `processing` for about a second, then `scheduled`/`rejected`. Poll `GET /bills/{id}`.
 - Show `ruleHits[].reason` as the "why it was routed" chips, `glAccountReason` beside the category, and `audit[]` in the side drawer.
 

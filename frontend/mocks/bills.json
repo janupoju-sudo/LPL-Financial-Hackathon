@@ -1,6 +1,6 @@
 [
- {"id":"b1","docId":"d1","vendorId":"v1","vendor":"Advent Software","amount":2450,"dueDate":"2026-10-15","glAccount":"6300 · Technology","status":"pending_approval","ruleHits":["Amount over $1,000 requires partner approval"]},
- {"id":"b2","docId":"d2","vendorId":"v2","vendor":"Brightline Marketing","amount":1850,"dueDate":"2026-10-10","glAccount":"6500 · Marketing","status":"pending_approval","ruleHits":["Amount over $1,000 requires partner approval","New vendor is missing W-9 and void check"]},
+ {"id":"b1","docId":"d1","vendorId":"v1","vendor":"Advent Software","amount":2450,"dueDate":"2026-10-15","glAccount":"6300 · Technology","status":"pending_approval","requiredApprovers":["partner"],"ruleHits":["Amount over $1,000 requires partner approval"]},
+ {"id":"b2","docId":"d2","vendorId":"v2","vendor":"Brightline Marketing","amount":1850,"dueDate":"2026-10-10","glAccount":"6500 · Marketing","status":"pending_approval","requiredApprovers":["partner"],"ruleHits":["Amount over $1,000 requires partner approval","New vendor is missing W-9 and void check"]},
  {"id":"b3","docId":"d3","vendor":"Coastal Kitchen","amount":186.5,"dueDate":"2026-10-02","glAccount":"6700 · Meals & travel","status":"pending_review","ruleHits":["Extraction confidence below 80%; verify document fields"]},
  {"id":"b4","docId":"d1","vendorId":"v1","vendor":"Advent Software","amount":850,"dueDate":"2026-09-15","glAccount":"6300 · Technology","status":"scheduled","ruleHits":[]}
 ]

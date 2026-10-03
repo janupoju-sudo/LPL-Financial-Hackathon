@@ -50,7 +50,8 @@
       "Type": "Choice",
       "Choices": [
         { "Variable": "$.approval.decision", "StringEquals": "approve", "Next": "PostLedger" },
-        { "Variable": "$.approval.decision", "StringEquals": "reevaluate", "Next": "EvaluateRules" }
+        { "Variable": "$.approval.decision", "StringEquals": "reevaluate", "Next": "EvaluateRules" },
+        { "Variable": "$.approval.decision", "StringEquals": "withdraw", "Next": "MarkRejected" }
       ],
       "Default": "MarkRejected"
     },
@@ -77,7 +78,8 @@
       "Type": "Choice",
       "Choices": [
         { "Variable": "$.hold.decision", "StringEquals": "approve", "Next": "PostLedger" },
-        { "Variable": "$.hold.decision", "StringEquals": "reject", "Next": "MarkRejected" }
+        { "Variable": "$.hold.decision", "StringEquals": "reject", "Next": "MarkRejected" },
+        { "Variable": "$.hold.decision", "StringEquals": "withdraw", "Next": "MarkRejected" }
       ],
       "Default": "EvaluateRules"
     },
@@ -100,10 +102,22 @@
         "FunctionName": "${SchedulePaymentFunctionArn}",
         "Payload": { "practiceId.$": "$.practiceId", "billId.$": "$.billId" }
       },
-      "ResultSelector": { "scheduledFor.$": "$.Payload.scheduledFor", "confirmation.$": "$.Payload.confirmation" },
+      "ResultSelector": { "status.$": "$.Payload.status", "scheduledFor.$": "$.Payload.scheduledFor", "confirmation.$": "$.Payload.confirmation" },
       "ResultPath": "$.payment",
       "Retry": [{ "ErrorEquals": ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException", "Lambda.TooManyRequestsException"], "IntervalSeconds": 1, "MaxAttempts": 3, "BackoffRate": 2 }],
-      "Next": "EmitLedgerUpdated"
+      "Next": "PaymentOutcome"
+    },
+    "PaymentOutcome": {
+      "Type": "Choice",
+      "Choices": [
+        { "Variable": "$.payment.status", "StringEquals": "voiding", "Next": "EndWithoutPayment" },
+        { "Variable": "$.payment.status", "StringEquals": "voided", "Next": "EndWithoutPayment" },
+        { "Variable": "$.payment.status", "StringEquals": "withdrawn", "Next": "EndWithoutPayment" }
+      ],
+      "Default": "EmitLedgerUpdated"
+    },
+    "EndWithoutPayment": {
+      "Type": "Succeed"
     },
     "EmitLedgerUpdated": {
       "Type": "Task",

@@ -54,8 +54,8 @@ export function normalizeBill(bill: ApiBill): Bill {
     ...(bill.glAccountReason ? { glAccountReason: bill.glAccountReason } : {}),
     ...(bill.invoiceNumber ? { invoiceNumber: bill.invoiceNumber } : {}),
     ...(bill.requiredApprovers ? { requiredApprovers: bill.requiredApprovers } : {}),
-    ...(bill.createdAt ? { createdAt: bill.createdAt } : {}),
     ...(bill.createdBy ? { createdBy: bill.createdBy } : {}),
+    ...(bill.createdAt ? { createdAt: bill.createdAt } : {}),
   };
 }
 export const normalizeBillDetail = (bill: ApiBill): BillDetail => ({

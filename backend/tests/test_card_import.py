@@ -111,6 +111,25 @@ def test_receipt_with_ambiguous_equal_date_candidates_is_not_matched(aws):
     assert body["matchedReceipts"] == 0
 
 
+def test_receipt_uploaded_after_card_import_links_existing_charge(aws):
+    csv = "Date,Description,Amount\n2026-09-23,RIVERSIDE CAFE,37.18\n"
+    status, body = _import(csv)
+    assert status == 200
+    txn_id = body["transactions"][0]["txnId"]
+
+    doc = repo.create_document("p1", "receipt.pdf", "application/pdf", "uploads/p1/d1/receipt.pdf", "dev")
+    receipt_date = "2026-09-22"
+    repo.update_document(
+        "p1", doc["documentId"], type="receipt", status="processed",
+        extracted={"amount": 37.18, "invoiceDate": receipt_date},
+    )
+
+    assert ledger.match_card_receipt("p1", doc["documentId"], 37.18, receipt_date) == txn_id
+    updated = next(line for line in _card_lines() if line["sourceId"] == txn_id)
+    assert updated["sourceDocId"] == doc["documentId"]
+    assert ledger.match_card_receipt("p1", "another-receipt", 37.18, receipt_date) is None
+
+
 def test_accepts_base64_body_and_alternate_headers(aws):
     csv = "Transaction Date,Merchant,Debit\n09/20/2026,Marriott Boston,389.00\n"
     status, body = _import(csv, b64=True)

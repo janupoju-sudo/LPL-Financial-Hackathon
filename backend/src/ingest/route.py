@@ -65,7 +65,7 @@ def handler(event: Mapping[str, Any], context: Any = None) -> dict[str, Any]:
     if "createdBill" in event:
         return complete_bill_handler(event, context)
 
-    from shared import ledger, repo
+    from shared import config, ledger, repo
 
     upload, normalized = _document_fields(event)
     practice_id = upload["practiceId"]
@@ -74,6 +74,36 @@ def handler(event: Mapping[str, Any], context: Any = None) -> dict[str, Any]:
     confidence = normalized.get("confidence", 0.0)
     vendor_match = event.get("vendorMatch", {}).get("data", {}).get("vendor")
     extracted = dict(normalized)
+
+    if document_type == "receipt":
+        if confidence < config.REVIEW_CONFIDENCE_THRESHOLD:
+            reason = "Receipt extraction confidence is below the review threshold"
+            repo.update_document(
+                practice_id,
+                document_id,
+                type=document_type,
+                status="needs_review",
+                confidence=confidence,
+                extracted={**extracted, "reviewReason": reason},
+            )
+            return {"status": "needs_review", "reason": reason}
+
+        card_txn_id = ledger.match_card_receipt(
+            practice_id,
+            document_id,
+            normalized.get("amount"),
+            normalized.get("invoiceDate") or normalized.get("date"),
+        )
+        fields = {
+            "type": document_type,
+            "status": "processed",
+            "confidence": confidence,
+            "extracted": extracted,
+        }
+        if card_txn_id:
+            fields["cardTxnId"] = card_txn_id
+        repo.update_document(practice_id, document_id, **fields)
+        return {"status": "processed", "cardTxnId": card_txn_id}
 
     if document_type in {"w9", "void_check"}:
         if confidence < 0.8 or not normalized.get("vendorName"):
