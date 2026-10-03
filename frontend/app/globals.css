@@ -97,3 +97,10 @@ html[data-theme="dark"] .skeleton { background: linear-gradient(90deg, #1b2821, 
 .documents-tabs + .vendor-panel { margin-top: 22px; }
 
 .filters .search-field { min-width: 180px; }
+
+.documents-summary { gap: 20px; }
+.documents-summary button { padding: 8px 10px; border-radius: 7px; text-align: left; }
+.documents-summary button:hover, .documents-summary button[aria-pressed="true"] { background: var(--surface-soft); }
+.documents-summary button:hover { text-decoration: underline; text-underline-offset: 3px; }
+.document-results { scroll-margin-top: 20px; }
+.document-results:focus { outline: 2px solid var(--primary); outline-offset: 6px; border-radius: 7px; }

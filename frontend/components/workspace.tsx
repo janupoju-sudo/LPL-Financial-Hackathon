@@ -129,6 +129,17 @@ function DocumentsPage({ documents: records, vendors, bills, openDoc, onUpload, 
   const searchParams = useSearchParams();
   const [showUpload, setShowUpload] = useState(legacyUpload || searchParams.get('upload') === '1');
   const [view, setView] = useState('all');
+  const resultsSection = useRef<HTMLElement>(null);
+  const [scrollRequest, setScrollRequest] = useState(0);
+  useEffect(() => {
+    if (!scrollRequest || !resultsSection.current) return;
+    resultsSection.current.focus({ preventScroll: true });
+    resultsSection.current.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth', block: 'start' });
+  }, [scrollRequest]);
+  const jumpToDocuments = (nextView: string) => {
+    setView(nextView); setQuery(''); setType('all'); setVendor('all'); setDate(''); setStatus('all');
+    setScrollRequest(request => request + 1);
+  };
   const [query, setQuery] = useState(''); const [type, setType] = useState('all'); const [vendor, setVendor] = useState('all'); const [date, setDate] = useState(''); const [status, setStatus] = useState('all');
   useEffect(() => { if (legacyUpload || searchParams.get('upload') === '1') setShowUpload(true); }, [legacyUpload, searchParams]);
   const needsReview = (doc: Document) => {
@@ -138,17 +149,20 @@ function DocumentsPage({ documents: records, vendors, bills, openDoc, onUpload, 
     return bill?.status === 'pending_review' || (!USE_LOCAL_API && doc.status === 'processed' && doc.confidence < .8);
   };
   const reviewCount = documents.filter(needsReview).length;
-  const processingCount = documents.filter(d => ['processing', 'uploaded', 'queued', 'pending'].includes(d.status)).length;
-  const filtered = documents.filter(d => (view !== 'review' || needsReview(d)) && `${d.filename} ${d.vendorName}`.toLowerCase().includes(query.toLowerCase()) && (type === 'all' || d.type === type) && (vendor === 'all' || d.vendorName === vendor) && (status === 'all' || d.status === status) && (!date || d.createdAt.slice(0, 10) >= date)).sort((a, b) => b.createdAt.localeCompare(a.createdAt) || a.filename.localeCompare(b.filename));
+  const isProcessing = (doc: Document) => ['processing', 'uploaded', 'extracting', 'queued', 'pending'].includes(doc.status);
+  const processingCount = documents.filter(isProcessing).length;
+  const filtered = documents.filter(d => (view !== 'review' || needsReview(d)) && (view !== 'processing' || isProcessing(d)) && `${d.filename} ${d.vendorName}`.toLowerCase().includes(query.toLowerCase()) && (type === 'all' || d.type === type) && (vendor === 'all' || d.vendorName === vendor) && (status === 'all' || d.status === status) && (!date || d.createdAt.slice(0, 10) >= date)).sort((a, b) => b.createdAt.localeCompare(a.createdAt) || a.filename.localeCompare(b.filename));
   return <>
     <PageHeading eyebrow="YOUR DOCUMENTS" title="Documents" description="Upload paperwork, review new arrivals, and find your records." action={<div className="documents-actions"><Button variant="outline" disabled={exporting} onClick={exportPackage}><ArrowDownToLine size={16} />{exporting ? 'Preparing...' : 'Export package'}</Button><Button disabled={USE_LOCAL_API} aria-expanded={showUpload} aria-controls="document-upload" onClick={() => setShowUpload(true)}><UploadCloud size={16} />Upload</Button></div>} />
-    <div className="summary-strip" aria-label="Document summary"><span><strong>{documents.length}</strong> documents</span><span><strong>{reviewCount}</strong> need review</span><span><strong>{processingCount}</strong> processing</span></div>
+    <div className="summary-strip documents-summary" role="group" aria-label="Document summary"><button aria-label={`Show all ${documents.length} documents`} aria-controls="document-results" aria-pressed={view === 'all'} onClick={() => jumpToDocuments('all')}><strong>{documents.length}</strong> documents</button><button aria-label={`Show ${reviewCount} documents needing review`} aria-controls="document-results" aria-pressed={view === 'review'} onClick={() => jumpToDocuments('review')}><strong>{reviewCount}</strong> need review</button><button aria-label={`Show ${processingCount} processing documents`} aria-controls="document-results" aria-pressed={view === 'processing'} onClick={() => jumpToDocuments('processing')}><strong>{processingCount}</strong> processing</button></div>
     {showUpload && <section id="document-upload" className="documents-upload"><div className="documents-upload-heading"><h2>Upload a document</h2><button aria-label="Close upload area" onClick={() => setShowUpload(false)}><X size={20} /></button></div><Upload onComplete={onUpload} notify={notify} /></section>}
-    <div className="tabs documents-tabs" role="group" aria-label="Document views">{[{ id: 'all', name: 'All documents' }, { id: 'review', name: `Needs review (${reviewCount})` }, { id: 'vendors', name: 'Vendors' }].map(tab => <button key={tab.id} className={view === tab.id ? 'selected' : ''} aria-pressed={view === tab.id} onClick={() => setView(tab.id)}>{tab.name}</button>)}</div>
+    <section id="document-results" ref={resultsSection} className="document-results" tabIndex={-1} aria-label="Document results">
+    <div className="tabs documents-tabs" role="group" aria-label="Document views">{[{ id: 'all', name: 'All documents' }, { id: 'review', name: `Needs review (${reviewCount})` }, { id: 'processing', name: `Processing (${processingCount})` }, { id: 'vendors', name: 'Vendors' }].map(tab => <button key={tab.id} className={view === tab.id ? 'selected' : ''} aria-pressed={view === tab.id} onClick={() => setView(tab.id)}>{tab.name}</button>)}</div>
     {view === 'vendors' ? <section className="panel vendor-panel"><div className="panel-heading"><h2>Vendors</h2><span className="muted">{vendors.length} vendor records</span></div>{vendors.length ? <div className="table-scroll"><table><thead><tr><th>Vendor</th><th>Default account</th><th>W-9</th><th>Void check</th><th>Bills</th></tr></thead><tbody>{vendors.map(v => <tr key={v.id || v.name}><td>{v.name}</td><td>{v.defaultGlAccount}</td><td>{v.hasW9 ? 'On file' : 'Missing'}</td><td>{v.hasVoidCheck ? 'On file' : 'Missing'}</td><td>{v.billCount}</td></tr>)}</tbody></table></div> : <Empty text="No vendor records yet." />}</section> : <>
       <div className="filters"><label className="search-field"><Search size={17} /><input aria-label="Search documents" placeholder="Search documents or vendors..." value={query} onChange={e => setQuery(e.target.value)} /></label><select aria-label="Document type" value={type} onChange={e => setType(e.target.value)}>{['all', 'invoice', 'receipt', 'payout_statement', 'w9', 'void_check'].map(t => <option key={t} value={t}>{t === 'all' ? 'All types' : label(t)}</option>)}</select><select aria-label="Vendor filter" value={vendor} onChange={e => setVendor(e.target.value)}><option value="all">All vendors</option>{Array.from(new Set(documents.map(d => d.vendorName).filter(Boolean))).sort().map(v => <option key={v}>{v}</option>)}</select><select aria-label="Document status" value={status} onChange={e => setStatus(e.target.value)}><option value="all">All statuses</option>{Array.from(new Set(documents.map(d => d.status))).sort().map(s => <option key={s} value={s}>{label(s)}</option>)}</select><input aria-label="Documents from date" type="date" value={date} onChange={e => setDate(e.target.value)} /></div>
       <DocumentTable documents={filtered} openDoc={openDoc} />
     </>}
+    </section>
   </>;
 }
 function Ask({ openDoc }: { openDoc: (id: string) => void }) {
