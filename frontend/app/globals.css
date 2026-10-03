@@ -896,3 +896,24 @@ input[type="file"]::file-selector-button:hover { filter: brightness(1.12); }
   .content { padding-bottom: 96px; }
 }
 @media (max-width: 600px) { .ob-range-ends span:nth-child(4) { display: none; } }
+
+/* Wizard step 3: what each role does */
+.ob-role-note { grid-column: 2 / -1; grid-row: 3; color: var(--muted); font-size: 12.5px; line-height: 1.45; }
+.ob-roles button:focus-visible { outline: 2px solid var(--ink); outline-offset: 1px; }
+.ob-guide { padding: 16px; border-radius: var(--r-lg); background: var(--surface); border: 1px solid var(--line); }
+.ob-guide-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 12px; }
+.ob-guide-head strong { font-size: 14px; font-weight: 600; }
+.ob-guide-head small { color: var(--faint); font-size: 12px; }
+.ob-guide-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.ob-guide-tile { position: relative; display: grid; align-content: start; gap: 6px; padding: 12px; border-radius: var(--r-md); border: 1px solid transparent; background: none; color: var(--ink); text-align: left; font: inherit; cursor: pointer; transition: border-color .2s; }
+.ob-guide-tile:not(.on):hover { border-color: var(--line); }
+.ob-guide-tile > *:not(.ob-guide-glow) { position: relative; z-index: 1; }
+.ob-guide-glow { position: absolute; inset: 0; z-index: 0; border-radius: var(--r-md); background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--line-strong); }
+.ob-guide-title { display: flex; align-items: center; gap: 8px; font-size: 13.5px; font-weight: 600; }
+.ob-guide-icon { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 8px; background: var(--hover); color: var(--ink-2); transition: background .2s, color .2s; }
+.ob-guide-tile.on .ob-guide-icon { background: var(--accent); color: var(--accent-ink); }
+.ob-guide-tile small { color: var(--muted); font-size: 12px; line-height: 1.45; }
+.ob-caps { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
+.ob-cap { display: inline-flex; align-items: center; gap: 3px; padding: 2px 8px 2px 6px; border-radius: 999px; background: var(--hover); color: var(--faint); font-size: 11px; font-weight: 500; }
+.ob-cap.yes { background: var(--ok-soft); color: var(--ok); }
+@media (max-width: 600px) { .ob-guide-grid { grid-template-columns: 1fr; } .ob-guide-head { flex-direction: column; gap: 2px; } .ob-role-note { grid-column: 1 / -1; } }

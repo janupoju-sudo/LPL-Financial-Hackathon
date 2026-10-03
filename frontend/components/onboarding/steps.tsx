@@ -2,9 +2,9 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { Building2, Check, FileText, Link2, Plus, ShieldCheck, Trash2, UploadCloud, UserRound } from 'lucide-react';
+import { BookOpen, Building2, Check, Crown, FileText, Link2, Minus, Plus, ShieldCheck, Trash2, UploadCloud, UserRound, Wrench } from 'lucide-react';
 import { fadeUp, spring, stagger } from '../motion';
-import { type Answers, type Member, type TeamRole, REVENUE_TYPES, ROLE_INFO, SETUP_TASKS, STARTER_RULES } from './data';
+import { type Answers, type GuideRole, type Member, type TeamRole, CAPABILITIES, REVENUE_TYPES, ROLE_GUIDE, ROLE_INFO, SETUP_TASKS, STARTER_RULES } from './data';
 
 type StepProps = { answers: Answers; update: (patch: Partial<Answers>) => void };
 
@@ -73,12 +73,44 @@ export function BusinessStep({ answers, update }: StepProps) {
 
 let memberSeq = 0;
 
+const ROLE_ICONS = { owner: Crown, partner: ShieldCheck, ops: Wrench, lpl_bookkeeper: BookOpen } as const;
+const roleSummary = (role: GuideRole) => ROLE_GUIDE.find(r => r.role === role)!.summary;
+
+// "What each role does": one tile per role; the role you're looking at lights up.
+function RoleGuide({ active, onLook }: { active: GuideRole; onLook: (role: GuideRole) => void }) {
+  return (
+    <Item variants={fadeUp} className="ob-guide">
+      <div className="ob-guide-head"><strong>What each role does</strong><small>Hover or pick a role to see it here.</small></div>
+      <div className="ob-guide-grid">
+        {ROLE_GUIDE.map(r => {
+          const Icon = ROLE_ICONS[r.role]; const on = r.role === active;
+          return (
+            <button type="button" key={r.role} className={`ob-guide-tile ${on ? 'on' : ''}`} onMouseEnter={() => onLook(r.role)} onFocus={() => onLook(r.role)} onClick={() => onLook(r.role)} aria-pressed={on}>
+              {on && <motion.span layoutId="ob-guide-glow" className="ob-guide-glow" transition={spring} />}
+              <span className="ob-guide-title"><span className="ob-guide-icon"><Icon size={15} /></span>{r.label}</span>
+              <small>{r.summary}</small>
+              <span className="ob-caps">
+                {CAPABILITIES.map((c, i) => { const yes = r.can.includes(c.key); return (
+                  <motion.span key={c.key} className={`ob-cap ${yes ? 'yes' : ''}`} animate={on ? { opacity: 1, y: 0 } : { opacity: yes ? 0.9 : 0.55, y: 0 }} initial={false} transition={{ ...spring, delay: on ? i * 0.04 : 0 }}>
+                    {yes ? <Check size={11} /> : <Minus size={11} />}{c.label}
+                  </motion.span>
+                ); })}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </Item>
+  );
+}
+
 export function TeamStep({ answers, update }: StepProps) {
+  const [looking, setLooking] = useState<GuideRole>('partner');
   const set = (id: string, patch: Partial<Member>) => update({ team: answers.team.map(m => m.id === id ? { ...m, ...patch } : m) });
   const add = () => update({ team: [...answers.team, { id: `new-${Date.now()}-${memberSeq++}`, name: '', email: '', role: 'ops' }] });
   return (
     <motion.div className="ob-fields" variants={stagger(0.06)} initial="hidden" animate="show">
-      <Item variants={fadeUp} className="ob-member owner">
+      <Item variants={fadeUp} className="ob-member owner" onMouseEnter={() => setLooking('owner')}>
         <span className="ob-avatar">{initials(answers.yourName)}</span>
         <div><strong>{answers.yourName || 'You'}</strong><small>{answers.email}</small></div>
         <span className="ob-role-tag">Owner · approves everything</span>
@@ -94,19 +126,23 @@ export function TeamStep({ answers, update }: StepProps) {
               </div>
               <div className="ob-roles" role="radiogroup" aria-label={`Role for ${m.name || 'teammate'}`}>
                 {(Object.keys(ROLE_INFO) as TeamRole[]).map(role => (
-                  <button type="button" key={role} role="radio" aria-checked={m.role === role} className={m.role === role ? 'on' : ''} onClick={() => set(m.id, { role })} title={ROLE_INFO[role].blurb}>
+                  <button type="button" key={role} role="radio" aria-checked={m.role === role} className={m.role === role ? 'on' : ''} onClick={() => { set(m.id, { role }); setLooking(role); }} onMouseEnter={() => setLooking(role)} onFocus={() => setLooking(role)}>
                     {m.role === role && <motion.span layoutId={`role-${m.id}`} className="ob-roles-pill" transition={spring} />}
                     <span>{ROLE_INFO[role].label}</span>
                   </button>
                 ))}
               </div>
+              <AnimatePresence mode="wait" initial={false}>
+                <motion.small key={m.role} className="ob-role-note" initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 4 }} transition={{ duration: 0.18 }}>{roleSummary(m.role)}</motion.small>
+              </AnimatePresence>
               <button type="button" className="ob-icon-btn" onClick={() => update({ team: answers.team.filter(x => x.id !== m.id) })} aria-label={`Remove ${m.name || 'teammate'}`}><Trash2 size={15} /></button>
             </motion.li>
           ))}
         </AnimatePresence>
       </motion.ul>
       <Item variants={fadeUp}><button type="button" className="ob-add" onClick={add}><Plus size={15} />Add a teammate</button></Item>
-      <Item variants={fadeUp} className="ob-note"><ShieldCheck size={16} />Nobody can approve a bill they uploaded. Partners approve anything over your limit.</Item>
+      <RoleGuide active={looking} onLook={setLooking} />
+      <Item variants={fadeUp} className="ob-note"><ShieldCheck size={16} />Nobody can approve a bill they uploaded, whatever their role.</Item>
     </motion.div>
   );
 }
