@@ -8,8 +8,9 @@ def handler(event, context=None):
     practice_id, bill_id = event["practiceId"], event["billId"]
     bill = repo.get_bill(practice_id, bill_id)
     vendor = repo.get_vendor(practice_id, bill.get("vendorId")) or {}
+    doc_type = bill.get("documentType") or (repo.get_document(practice_id, bill.get("documentId")) or {}).get("type")
     ctx = {
-        "bill": {**bill, "isDuplicate": bool(bill.get("isDuplicate"))},
+        "bill": {**bill, "isDuplicate": bool(bill.get("isDuplicate")), "documentType": doc_type},
         "vendor": {**vendor, "isNew": int(vendor.get("billCount", 0)) <= 1},
     }
     result = evaluate(repo.list_rules(practice_id), ctx)

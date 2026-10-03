@@ -273,7 +273,7 @@ const RULE_FIELDS: { value: string; label: string; kind: 'number' | 'boolean' }[
   { value: 'bill.received', label: 'Goods or services received', kind: 'boolean' },
 ];
 const RULE_OPS: Record<string, string> = { gt: 'is over', gte: 'is at least', lt: 'is under', lte: 'is at most', eq: 'is', neq: 'is not' };
-const FIELD_WORDS: Record<string, string> = { 'bill.amount': 'bill amount', 'bill.isDuplicate': 'bill is a duplicate', 'bill.requiresReceipt': 'bill requires a receipt', 'bill.received': 'bill was received', 'vendor.hasW9': 'vendor has a W-9', 'vendor.hasVoidCheck': 'vendor has a void check' };
+const FIELD_WORDS: Record<string, string> = { 'bill.amount': 'bill amount', 'bill.documentType': 'document type', 'bill.isDuplicate': 'bill is a duplicate', 'bill.requiresReceipt': 'bill requires a receipt', 'bill.received': 'bill was received', 'vendor.hasW9': 'vendor has a W-9', 'vendor.hasVoidCheck': 'vendor has a void check' };
 function describeCondition(c?: RuleCondition): string {
   if (!c) return '';
   if (c.all) return c.all.map(describeCondition).join(' and ');
