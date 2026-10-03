@@ -51,8 +51,9 @@ class SeedVendorTests(unittest.TestCase):
         self.assertEqual(len(vendors), 9)
         self.assertEqual(len({v["name"].casefold() for v in vendors}), 9)
         for vendor in vendors:
-            self.assertIn(vendor["default_gl_account"],
-                          {"6100", "6200", "6300", "6400", "6500", "6600", "6700", "6900"})
+            from shared import coa
+
+            self.assertTrue(coa.is_expense(vendor["default_gl_account"]), vendor["name"])
         for name in ("Orion Software LLC", "Seaport Office Partners", "LPL Financial",
                      "Brightline Marketing", "Clearwater Compliance Advisors (FICTIONAL)"):
             self.assertIsNotNone(self.repo.find_vendor_by_name("p1", name))

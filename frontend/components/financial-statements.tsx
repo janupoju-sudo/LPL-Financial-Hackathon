@@ -2,7 +2,7 @@ import * as React from 'react';
 import type { Financials } from '@/lib/types';
 import { money } from '@/lib/format';
 
-type Row = { name: string; amount: number };
+type Row = { name: string; amount: number; previous?: number; children?: Row[] };
 type Section = { title: string; rows: Row[]; total?: Row };
 
 // The statement of shareholders' equity is derived from the other three, so it always ties out:
@@ -24,8 +24,27 @@ function equitySections(data: Financials): { sections: Section[]; note: string }
   };
 }
 
+// Change vs the previous period, shown only when it's meaningful (both periods have activity).
+function Change({ row, period }: { row: Row; period?: string }) {
+  if (!row.previous || !row.amount) return null;
+  const pct = (row.amount - row.previous) / row.previous * 100;
+  if (Math.abs(pct) < 1) return null;
+  return <span className={`change ${pct > 0 ? 'up' : 'down'}`} title={`${money(row.previous)} in ${period ?? 'the previous period'}`}>{pct > 0 ? '+' : ''}{pct.toFixed(0)}%</span>;
+}
+
+function StatementRow({ row, period }: { row: Row; period?: string }) {
+  const [open, setOpen] = React.useState(false);
+  const kids = row.children ?? [];
+  if (!kids.length) return <div className="statement-row"><span>{row.name}<Change row={row} period={period} /></span><span>{money(row.amount)}</span></div>;
+  return <>
+    <button type="button" className="statement-row expandable" aria-expanded={open} onClick={() => setOpen(!open)}><span><i className="caret" aria-hidden="true">{open ? '▾' : '▸'}</i>{row.name}<Change row={row} period={period} /></span><span>{money(row.amount)}</span></button>
+    {open && kids.map((child, i) => <div className="statement-row sub" key={`${child.name}-${i}`}><span>{child.name}<Change row={child} period={period} /></span><span>{money(child.amount)}</span></div>)}
+  </>;
+}
+
 export function FinancialStatement({ data, tab }: { data: Financials; tab: string }) {
   let sections: Section[]; let note: string;
+  const previous = data.kpis.previous?.period;
   if (tab === 'Income statement') {
     note = `For ${data.pnl.period}`;
     sections = [
@@ -51,5 +70,5 @@ export function FinancialStatement({ data, tab }: { data: Financials; tab: strin
       { title: 'Cash', rows: [{ name: 'Beginning cash', amount: data.cashFlow.beginningCash }, { name: 'Net change in cash', amount: data.cashFlow.netChange }], total: { name: 'Ending cash', amount: data.cashFlow.endingCash } },
     ];
   }
-  return <div className="statement"><p className="muted">{note}</p>{sections.map((section, i) => <section className="statement-section" key={`${section.title}-${i}`}>{section.title && section.rows.length > 0 && <h3>{section.title}</h3>}{section.rows.map((row, index) => <div className="statement-row" key={`${row.name}-${index}`}><span>{row.name}</span><span>{money(row.amount)}</span></div>)}{section.total && <div className="statement-row statement-total"><strong>{section.total.name}</strong><strong>{money(section.total.amount)}</strong></div>}</section>)}</div>;
+  return <div className="statement"><p className="muted">{note}</p>{sections.map((section, i) => <section className="statement-section" key={`${section.title}-${i}`}>{section.title && section.rows.length > 0 && <h3>{section.title}</h3>}{section.rows.map((row, index) => <StatementRow key={`${row.name}-${index}`} row={row} period={previous} />)}{section.total && <div className="statement-row statement-total"><strong>{section.total.name}</strong><strong>{money(section.total.amount)}</strong></div>}</section>)}</div>;
 }

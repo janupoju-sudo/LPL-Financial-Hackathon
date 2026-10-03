@@ -10,7 +10,7 @@ export interface CardTransaction { txnId: string; date: string; description: str
 export interface Vendor { id: string; name: string; defaultGlAccount: string; hasW9: boolean; hasVoidCheck: boolean; billCount: number; bankDetailReviewRequired?: boolean; possibleDuplicateVendorNames?: string[]; }
 export interface RuleCondition { field?: string; op?: string; value?: string | number | boolean; all?: RuleCondition[]; any?: RuleCondition[]; not?: RuleCondition; }
 export interface Rule { id: string; name: string; condition: RuleCondition; action: 'require_approval' | 'require_docs' | 'block'; approverRole?: Role; reason?: string; }
-export interface AccountLine { account: string | null; name: string; amount: number; }
+export interface AccountLine { account: string | null; name: string; amount: number; previous?: number; children?: AccountLine[]; }
 export interface Financials {
   period: string;
   pnl: { period: string; revenue: AccountLine[]; totalRevenue: number; expenses: AccountLine[]; totalExpenses: number; operatingIncome: number };

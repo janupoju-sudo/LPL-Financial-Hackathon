@@ -2,7 +2,8 @@
 
 The shape follows the frontend's contract (frontend/API.md, lib/types.ts):
   pnl:          {revenue, expenses, netIncome, monthly:[{month, period, revenue, expenses}],
-                 categories:[{name, account, amount}], revenueLines, expenseLines}
+                 categories:[{name, account, amount}], revenueLines,
+                 expenseLines:[{account, name, amount, previous, children:[...]}]}
   balanceSheet: {asOf, assets, liabilities, equity, assetLines, liabilityLines, equityLines}
   cashFlow:     {operating, investing, financing, net, beginningCash, endingCash,
                  operatingLines, financingLines}
@@ -28,7 +29,20 @@ def _pct(ratio) -> float | None:
 
 
 def _lines(lines) -> list[dict]:
-    return [{**l, "amount": _usd(l["amount"])} for l in lines]
+    return [{**l, "amount": _usd(l["amount"]),
+             **({"children": _lines(l["children"])} if "children" in l else {})} for l in lines]
+
+
+def _with_previous(lines, prev_lines) -> list[dict]:
+    """Expense categories and their sub-accounts, each with last period's amount for comparison."""
+    prev = {(l["account"], l["name"]): l["amount"] for l in prev_lines}
+    prev.update({(c["account"], c["name"]): c["amount"] for l in prev_lines for c in l.get("children", [])})
+    def tag(l):
+        out = {**l, "previous": _usd(prev.get((l["account"], l["name"]), 0))}
+        if "children" in l:
+            out["children"] = [tag(c) for c in l["children"]]
+        return out
+    return [tag(l) for l in _lines(lines)]
 
 
 def _monthly(entries, end: date) -> list[dict]:
@@ -65,7 +79,7 @@ def build_financials(entries, period: str, practice: dict | None = None) -> dict
             "categories": [{"name": l["name"], "account": l["account"], "amount": _usd(l["amount"])}
                            for l in sorted(pnl["expenses"], key=lambda l: -l["amount"])],
             "revenueLines": _lines(pnl["revenue"]),
-            "expenseLines": _lines(pnl["expenses"]),
+            "expenseLines": _with_previous(pnl["expenses"], prev_pnl["expenses"]),
         },
         "balanceSheet": {
             "asOf": bs["asOf"],

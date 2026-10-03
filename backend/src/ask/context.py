@@ -63,13 +63,15 @@ def ledger_summary(entries, period: str) -> tuple[str, list[str]]:
 
     amounts = {}
     for pnl, key in ((cur_pnl, "cur"), (prev_pnl, "prev")):
-        for l in pnl["revenue"] + pnl["expenses"]:
+        subs = [c for l in pnl["expenses"] for c in l.get("children", []) if coa.get(c["account"]).parent]
+        for l in pnl["revenue"] + pnl["expenses"] + subs:
             amounts.setdefault(l["account"], {"cur": 0, "prev": 0})[key] = l["amount"]
 
     rows = [f"Period {period} compared with {prev}. Amounts in dollars."]
     for code in sorted(amounts):
         a = amounts[code]
-        rows.append(f"- {code} {coa.get(code).name}: {_money(a['cur'])} (was {_money(a['prev'])}, "
+        indent = "  " if coa.get(code).parent else ""
+        rows.append(f"{indent}- {code} {coa.get(code).name}: {_money(a['cur'])} (was {_money(a['prev'])}, "
                     f"change {(a['cur'] - a['prev']) / 100:+,.0f})")
     pct = lambda r: "n/a" if r is None else f"{r:.1%}"
     rows += [
@@ -78,7 +80,9 @@ def ledger_summary(entries, period: str) -> tuple[str, list[str]]:
         f"- Operating margin: {pct(cur_k['margin'])} (was {pct(prev_k['margin'])})",
         f"- Recurring revenue share: {pct(cur_k['recurringPct'])} (was {pct(prev_k['recurringPct'])})",
     ]
-    drivers = sorted(amounts, key=lambda c: -abs(amounts[c]["cur"] - amounts[c]["prev"]))[:3]
+    # Drivers are categories (sub-accounts would double count their parent); the rows above give the detail.
+    drivers = sorted((c for c in amounts if not coa.get(c).parent),
+                     key=lambda c: -abs(amounts[c]["cur"] - amounts[c]["prev"]))[:3]
     return "\n".join(rows), drivers
 
 

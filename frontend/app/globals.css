@@ -318,6 +318,14 @@ a.kpi:hover { background: var(--glass-strong); }
 .statement-row { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 13px; font-variant-numeric: tabular-nums; }
 .statement-row span:last-child, .statement-row strong:last-child { font-family: var(--mono); }
 .statement-total { border-bottom: 0; }
+.statement-row.expandable { width: 100%; text-align: left; cursor: pointer; }
+.statement-row.expandable:hover { background: var(--hover); }
+.statement-row .caret { display: inline-block; width: 16px; font-style: normal; color: var(--muted); font-size: 11px; }
+.statement-row.sub { padding-left: 40px; font-size: 12.5px; color: var(--ink-2); }
+.statement-row > span:first-child { display: inline-flex; align-items: center; gap: 6px; }
+.change { font: 500 11px var(--mono); padding: 1px 7px; border-radius: 999px; }
+.change.up { background: var(--bad-soft); color: var(--bad); }
+.change.down { background: var(--ok-soft); color: var(--ok); }
 .attention-panel { display: flex; flex-direction: column; padding-bottom: 8px; }
 .count-bubble { min-width: 26px; height: 26px; padding: 0 8px; display: grid; place-items: center; border-radius: 999px; background: var(--hover); color: var(--ink-2); font: 600 12px var(--mono); }
 .queue { display: grid; gap: 10px; padding: 0 14px 10px; }

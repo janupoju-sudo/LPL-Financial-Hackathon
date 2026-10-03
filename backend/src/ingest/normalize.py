@@ -82,6 +82,12 @@ def normalize_invoice(
     if gl_account not in (None, ""):
         if not isinstance(gl_account, str) or not re.fullmatch(r"6\d{3}", gl_account):
             raise ValueError("glAccount must be a 6xxx expense code")
+        from shared import coa
+
+        if not coa.is_expense(gl_account):
+            # A made-up sub-account (e.g. 6790) falls back to its category, else to vendor memory.
+            category = gl_account[:2] + "00"
+            gl_account = category if coa.is_expense(category) else None
 
     confidence = _confidence(result.get("confidence"))
     vendor_confidence = _confidence(result.get("vendorConfidence"))
@@ -158,6 +164,12 @@ def _expense_context(result: Mapping[str, Any]) -> str:
     return json.dumps(documents, separators=(",", ":"))
 
 
+def _expense_chart() -> str:
+    from shared import coa
+
+    return coa.expense_menu()
+
+
 def handler(event: Mapping[str, Any], context: Any = None) -> dict[str, Any]:
     import boto3
 
@@ -184,7 +196,11 @@ def handler(event: Mapping[str, Any], context: Any = None) -> dict[str, Any]:
                 f"Normalize these Textract invoice fields. Use only supplied evidence; "
                 f"unknown fields are null. `confidence` is overall extraction confidence; "
                 f"`vendorConfidence` is confidence that vendorName identifies the correct "
-                f"vendor. Return JSON matching {schema}.\n"
+                f"vendor. `glAccount` is the most specific expense account from this chart "
+                f"(prefer an indented sub-account, e.g. a parking receipt is 6740; use the "
+                f"category code only if no sub-account fits; null if unclear):\n"
+                f"{_expense_chart()}\n"
+                f"Return JSON matching {schema}.\n"
                 f"{_expense_context(raw)}"
             )
             normalized = normalize_invoice(document_type, response)
