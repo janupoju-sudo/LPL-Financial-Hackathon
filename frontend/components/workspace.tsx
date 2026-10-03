@@ -33,6 +33,8 @@ const SUBNAV = [
 const ROUTES = ['/', '/revenue', '/bills', '/transactions', '/rules', '/documents', '/inbox', '/library', '/ask'];
 const ASK_SUGGESTIONS = ['Why did my margin drop in Q3?', 'Which payouts need follow-up?', 'What are my largest expenses?'];
 const isActive = (match: string[], path: string) => match.some(m => m === '/' ? path === '/' : path === m || path.startsWith(`${m}/`));
+const DEMO_PEOPLE: Record<string, string> = { maya: 'Maya Chen', raj: 'Raj', dev: 'Dev', priya: 'Priya' };
+const displayName = (email: string) => { const local = email.split('@')[0].toLowerCase(); return DEMO_PEOPLE[local] ?? local.replace(/[._-]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase()); };
 const authConfigured = Boolean(process.env.NEXT_PUBLIC_COGNITO_USER_POOL_ID && process.env.NEXT_PUBLIC_COGNITO_CLIENT_ID);
 if (authConfigured) Amplify.configure({ Auth: { Cognito: { userPoolId: process.env.NEXT_PUBLIC_COGNITO_USER_POOL_ID!, userPoolClientId: process.env.NEXT_PUBLIC_COGNITO_CLIENT_ID! } } });
 
@@ -44,7 +46,7 @@ export function Workspace() {
 
 function App({ signOut }: { signOut?: () => void }) {
   const pathname = usePathname(); const path = ['/inbox', '/library'].includes(pathname) ? '/documents' : pathname; const router = useRouter();
-  const [role, setRole] = useState<Role>('owner');
+  const [role, setRole] = useState<Role>('owner'); const [userName, setUserName] = useState('Maya Chen');
   const [documents, setDocuments] = useState<Document[]>([]); const [bills, setBills] = useState<Bill[]>([]); const [vendors, setVendors] = useState<Vendor[]>([]); const [rules, setRules] = useState<Rule[]>([]);
   const [financials, setFinancials] = useState<Financials>(); const [revenue, setRevenue] = useState<Reconciliation>();
   const [loading, setLoading] = useState(true); const [error, setError] = useState(''); const [toast, setToast] = useState('');
@@ -75,7 +77,7 @@ function App({ signOut }: { signOut?: () => void }) {
     document.addEventListener('keydown', onKey);
     return () => { document.removeEventListener('keydown', onKey); document.body.style.overflow = previousOverflow; previousFocus?.focus(); };
   }, [selected]);
-  useEffect(() => { if (USE_MOCKS || USE_LOCAL_API) return; import('aws-amplify/auth').then(async ({ fetchAuthSession }) => { const groups = (await fetchAuthSession()).tokens?.idToken?.payload['cognito:groups']; if (Array.isArray(groups)) { const actual = groups.find(g => ['owner', 'partner', 'ops', 'lpl_bookkeeper'].includes(String(g))); if (actual) setRole(actual as Role); } }); }, []);
+  useEffect(() => { if (USE_MOCKS || USE_LOCAL_API) return; import('aws-amplify/auth').then(async ({ fetchAuthSession }) => { const payload = (await fetchAuthSession()).tokens?.idToken?.payload; const groups = payload?.['cognito:groups']; if (typeof payload?.email === 'string') setUserName(displayName(payload.email)); if (Array.isArray(groups)) { const actual = groups.find(g => ['owner', 'partner', 'ops', 'lpl_bookkeeper'].includes(String(g))); if (actual) setRole(actual as Role); } }); }, []);
   useEffect(() => { if (!billDetail) return; const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setBillDetail(undefined); }; document.addEventListener('keydown', onKey); return () => document.removeEventListener('keydown', onKey); }, [billDetail]);
   const openBill = async (id: string) => { setBusy(id); try { setBillDetail(await api.bill(id)); } catch (e) { setToast(message(e)); } finally { setBusy(''); } };
   const openDoc = async (id: string) => { setBusy(id); try { setSelected(await api.document(id)); } catch (e) { setToast(message(e)); } finally { setBusy(''); } };
@@ -120,12 +122,12 @@ function App({ signOut }: { signOut?: () => void }) {
         <button className="topbar-search" onClick={() => setPalette(true)} aria-label="Search, ask or jump to a page"><Search size={18} /><span>Search, ask, or jump…</span><kbd>⌘K</kbd></button>
         <div className="topbar-right">
           <Link className="icon-button" href="/documents?upload=1" aria-label="Upload a document" title="Upload a document"><Plus size={19} /></Link>
-          <div className="topbar-chip"><ProfileSettings role={label(role)} /></div></div></header>
+          <div className="topbar-chip"><ProfileSettings name={userName} role={label(role)} /></div></div></header>
       <main className="content">{USE_LOCAL_API && <div className="alert">Local sample data: financials, reconciliation, Ask and export use D’s server. Uploads and approvals are unavailable.</div>}
         {error && <div role="alert" className="alert error">{error}<Button variant="outline" onClick={() => { setLoading(true); void refresh(); }}>Retry</Button></div>}
         {subnav && <nav className="subnav" aria-label="Section">{subnav.map(item => <Link key={item.path} href={item.path} className={path === item.path ? 'active' : ''} aria-current={path === item.path ? 'page' : undefined}><item.icon size={15} />{item.name}</Link>)}</nav>}
         {loading ? <div className="skeleton-grid" aria-label="Loading practice data">{[1, 2, 3, 4, 5, 6].map(n => <div key={n} className="skeleton" />)}</div> : <>
-          {path === '/' && financials && <Dashboard data={financials} bills={bills} revenue={revenue} period={period} setPeriod={setPeriod} exportPackage={exportPackage} exporting={busy === 'export'} openAsk={openAsk} openBill={openBill} />}
+          {path === '/' && financials && <Dashboard userName={userName} data={financials} bills={bills} revenue={revenue} period={period} setPeriod={setPeriod} exportPackage={exportPackage} exporting={busy === 'export'} openAsk={openAsk} openBill={openBill} />}
           {path === '/documents' && <Suspense fallback={<Empty text="Loading documents..." />}><DocumentsPage documents={documents} vendors={vendors} bills={bills} openDoc={openDoc} openBill={openBill} onUpload={doc => { setSelected(doc); void refresh(); }} notify={setToast} exportPackage={exportPackage} exporting={busy === 'export'} legacyUpload={pathname === '/inbox'} /></Suspense>}
           {path === '/bills' && <><PageHeading eyebrow="MONEY OUT" title="Bills & approvals" description="Every payment, with the right checks in place." action={<Link className="button primary" href="/documents?upload=1"><Plus size={16} /> Upload a bill</Link>} /><div className="summary-strip"><span><strong>{pending.length}</strong> awaiting approval</span><span><strong>{money(pending.reduce((s, b) => s + b.amount, 0))}</strong> pending total</span><span><ShieldCheck size={16} /> Payments are simulated</span></div><BillsTable bills={bills} role={role} busy={busy} decide={decide} openDoc={openDoc} openBill={openBill} /></>}
           {path === '/revenue' && revenue && <Revenue data={revenue} openDoc={openDoc} />}
@@ -180,11 +182,11 @@ function PageHeading({ eyebrow, title, description, action }: { eyebrow: string;
 function Empty({ text }: { text: string }) { return <div className="empty"><FolderOpen size={26} /><p>{text}</p></div>; }
 function Pill({ status }: { status: string }) { return <span className={`pill ${status}`}><span />{label(status)}</span>; }
 
-function Dashboard({ data, bills, revenue, period, setPeriod, exportPackage, exporting, openAsk, openBill }: { data: Financials; bills: Bill[]; revenue?: Reconciliation; period: string; setPeriod: (p: string) => void; exportPackage: () => void; exporting: boolean; openAsk: (q?: string) => void; openBill: (id: string) => void }) {
+function Dashboard({ userName, data, bills, revenue, period, setPeriod, exportPackage, exporting, openAsk, openBill }: { userName: string; data: Financials; bills: Bill[]; revenue?: Reconciliation; period: string; setPeriod: (p: string) => void; exportPackage: () => void; exporting: boolean; openAsk: (q?: string) => void; openBill: (id: string) => void }) {
   const [tab, setTab] = useState('Income statement');
   const pending = bills.filter(b => ['pending_approval', 'pending_review'].includes(b.status));
   const prevMargin = data.kpis.previous?.margin; const marginDelta = data.kpis.margin !== null && typeof prevMargin === 'number' ? (data.kpis.margin - prevMargin) * 100 : null;
-  return <><PageHeading eyebrow="HOME" title={`${greeting()}, Maya`} description="Here's how Harbor Point is doing." action={<div className="heading-actions"><select aria-label="Financial period" value={period} onChange={e => setPeriod(e.target.value)}>{USE_MOCKS && !USE_LOCAL_API ? <option value="2026-Q3">Q3 2026 · Jul – Sep</option> : <><option value="2026-Q3">Q3 2026 · Jul – Sep</option><option value="2026-08">August 2026</option><option value="2026-07">July 2026</option><option value="2026-Q2">Q2 2026 · Apr – Jun</option><option value="2026">2026 year to date</option></>}</select></div>} />
+  return <><PageHeading eyebrow="HOME" title={`${greeting()}, ${userName.split(' ')[0]}`} description="Here's how Harbor Point is doing." action={<div className="heading-actions"><select aria-label="Financial period" value={period} onChange={e => setPeriod(e.target.value)}>{USE_MOCKS && !USE_LOCAL_API ? <option value="2026-Q3">Q3 2026 · Jul – Sep</option> : <><option value="2026-Q3">Q3 2026 · Jul – Sep</option><option value="2026-08">August 2026</option><option value="2026-07">July 2026</option><option value="2026-Q2">Q2 2026 · Apr – Jun</option><option value="2026">2026 year to date</option></>}</select></div>} />
     <div className="home-grid"><div className="home-main">
       <section className="panel hero-card"><div className="hero-top"><span className="label">Est. practice value <span title={data.valuation.method}><CircleHelp size={14} /></span></span><span className="chip">{USE_MOCKS ? 'Sample data' : 'Built on recurring revenue'}</span></div>
         <div className="hero-num"><span><Amount value={data.valuation.mid} /></span><span className="delta up">{percent(data.kpis.recurringPct)} recurring</span></div>
