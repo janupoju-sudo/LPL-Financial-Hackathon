@@ -93,6 +93,7 @@ Dependencies are noted as `← B3` (wait on, or mock, that task).
 - [x] C19. Cognito self-signup disabled (#16)
 - [x] C20. Frontend live-mode adapter for C's API field names (#29)
 - [x] C21. `POST /documents/{id}/resolve`: close out Needs Review documents (#35)
+- [x] C22. Rename to **Otter** (logo, favicon, title); landing page at `/` and a 5-step animated onboarding wizard at `/signup` (demo only: no account is created, self-signup stays off; ends at sign-in with the email filled in)
 
 ---
 
