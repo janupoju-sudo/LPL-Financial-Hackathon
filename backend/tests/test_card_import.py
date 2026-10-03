@@ -126,6 +126,7 @@ def test_rejects_bad_csv_and_wrong_role(aws):
     assert _import("Date,Description,Amount\n2026-09-01,X,abc\n")[0] == 400
     assert _import("")[0] == 400
     assert _import(CSV, groups=("partner",))[0] == 403
+    assert _import(CSV, groups=("lpl_bookkeeper",))[0] == 403
 
 
 def test_list_transactions_reads_imported_charges(aws):

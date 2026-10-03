@@ -36,7 +36,7 @@ def test_dismiss_marks_document_reviewed_with_audit(aws):
 
 def test_accept_marks_processed(aws):
     doc_id = _needs_review()
-    status, body = _resolve(doc_id, {"resolution": "accept"}, groups=("lpl_bookkeeper",))
+    status, body = _resolve(doc_id, {"resolution": "accept"}, groups=("ops",))
     assert status == 200
     assert body["status"] == "processed"
     assert body["review"]["resolution"] == "accept"
@@ -63,7 +63,29 @@ def test_validation_role_and_missing(aws):
     assert _resolve(doc_id, {})[0] == 400
     assert _resolve(doc_id, {"resolution": "dismiss", "note": "x" * 501})[0] == 400
     assert _resolve(doc_id, {"resolution": "dismiss"}, groups=("partner",))[0] == 403
+    assert _resolve(doc_id, {"resolution": "dismiss"}, groups=("lpl_bookkeeper",))[0] == 403
     assert _resolve("doc-missing", {"resolution": "dismiss"})[0] == 404
+
+
+def test_upload_url_is_owner_or_ops_only(aws, monkeypatch):
+    class FakeS3:
+        def generate_presigned_url(self, operation, Params, ExpiresIn):
+            return "https://upload.example"
+
+    monkeypatch.setattr(documents, "s3", lambda: FakeS3())
+    event = api_event("POST /documents/upload-url", body={"filename": "invoice.pdf"})
+    for group in ("partner", "lpl_bookkeeper"):
+        denied = documents.handler({**event, "requestContext": {"authorizer": {"jwt": {"claims": {
+            "sub": "user-denied", "cognito:groups": f"[{group}]",
+        }}}}})
+        assert denied["statusCode"] == 403
+
+    for group in ("owner", "ops"):
+        allowed = documents.handler({**event, "requestContext": {"authorizer": {"jwt": {"claims": {
+            "sub": f"user-{group}", "email": f"{group}@harborpoint.example",
+            "cognito:groups": f"[{group}]",
+        }}}}})
+        assert allowed["statusCode"] == 201
 
 
 def test_concurrent_resolve_loses_conditional_write(aws, monkeypatch):

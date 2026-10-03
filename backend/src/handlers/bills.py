@@ -12,7 +12,7 @@ from datetime import date
 from botocore.exceptions import ClientError
 
 from shared import coa, config, repo, workflow
-from shared.auth import get_caller
+from shared.auth import get_caller, require_role
 from shared.ddb import money, public
 from shared.http import HttpError, parse_body, path_param, query_param, router
 
@@ -113,10 +113,10 @@ def decide(event):
 
     status = bill.get("status")
     if status == "pending_approval":
-        allowed = set(bill.get("requiredApprovers") or ["owner"]) | {"owner"}
+        allowed = (set(bill.get("requiredApprovers") or ["owner"]) & {"owner", "partner"}) | {"owner"}
     elif status == "pending_docs":
-        # Override a hold: only the owner may approve; owner or partner may reject.
-        allowed = {"owner"} if decision == "approve" else {"owner", "partner"}
+        # A held bill is not yet waiting on a partner decision.
+        allowed = {"owner"}
     else:
         raise HttpError(409, f"Bill is not waiting for a decision (status: {status})")
     if not caller.has_any(*allowed):
@@ -137,6 +137,7 @@ def decide(event):
 
 def confirm(event):
     caller = get_caller(event)
+    require_role(caller, "owner", "ops")
     bill = _load(caller, path_param(event, "id"))
     if bill.get("status") != "pending_review":
         raise HttpError(409, f"Only bills in pending_review can be confirmed (status: {bill.get('status')})")
@@ -186,6 +187,7 @@ def confirm(event):
 
 def receive(event):
     caller = get_caller(event)
+    require_role(caller, "owner", "ops")
     bill = _load(caller, path_param(event, "id"))
     repo.update_bill(caller.practice_id, bill["billId"], set_fields={"received": True},
                      audit=repo.audit_event(caller.label, "marked_received"))

@@ -15,7 +15,7 @@ Decision precedence: block > hold > require_approval > auto_approve.
 from decimal import Decimal
 
 ACTIONS = ("require_approval", "hold", "block")
-ROLES = ("owner", "partner", "ops", "lpl_bookkeeper")
+ROLES = ("owner", "partner")
 
 
 def _num(v):
