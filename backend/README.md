@@ -54,12 +54,14 @@ sam build && sam deploy --guided       # first time; stack name ledgerline-dev
 # installs the anthropic SDK; or use `sam build --use-container` with Docker running.
 # When prompted for BedrockModelId, enter the exact model ID enabled for this account.
 # Do not accept a default: the parameter is required for Ask and document classification.
+# First-time seeding of an EMPTY table only. Pass --docs-bucket so the history source PDFs are
+# uploaded and their records end up "processed". Don't re-run seed_ddb.py on a table that's in
+# use: it rewrites source-document records (status back to pending_upload, links dropped).
 python scripts/seed.py --table ledgerline-dev
-python scripts/seed_ddb.py --table ledgerline-dev  # history through Aug 2026
-# Before a live September demo, add normal September expenses only:
-python scripts/seed_ddb.py --table ledgerline-dev --live-sept
-# Only if the live payout upload failed and no September payout exists:
-python scripts/seed_ddb.py --table ledgerline-dev --include-sept
+python scripts/seed_ddb.py --table ledgerline-dev --docs-bucket <DocsBucketName> --live-sept
+python scripts/seed_bills.py --table ledgerline-dev   # June-August history bills (seeded=True)
+# Only if the live payout upload failed and no September payout exists, use --include-sept
+# instead of --live-sept.
 python scripts/demo_users.py --user-pool-id <UserPoolId> --client-id <UserPoolClientId>
 ```
 Stack outputs give you `ApiUrl`, `UserPoolId`, `UserPoolClientId`, `DocsBucketName`,
@@ -168,11 +170,13 @@ python scripts/reset_demo.py --table ledgerline-dev --practice p1 --execute
 ```
 
 The default is read-only; mutations require the explicit `--execute`, `--table`,
-and `--practice` arguments. The reset removes that practice's bills, uploaded
-demo document records, ledger postings linked to those bills/documents, and all
-September 2026 revenue-line records, including live/fallback payout entries. It
-preserves META, rules, supporting `seed-sources/` document records, seeded
-historical journals/revenue, and September baseline expense/payment journals.
+and `--practice` arguments. The reset removes that practice's demo bills, uploaded
+demo document records, ledger postings linked to those bills/documents, imported card
+charges (`j-card-*` journals; no seed creates them), and all September 2026
+revenue-line records, including live/fallback payout entries. It preserves META,
+rules, the June-August history bills from `seed_bills.py` (`seeded: True`), supporting
+`seed-sources/` document records, seeded historical journals/revenue, and September
+baseline expense/payment journals. One command gives a clean rehearsal; no re-seed needed.
 Brightline's W-9/void-check flags are reset to missing and its demo bank suffix is
 removed. The operation is practice-scoped and safe to repeat.
 
