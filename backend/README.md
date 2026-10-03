@@ -110,22 +110,24 @@ Controls: no self-approval (uploader ≠ approver), one decision per task token 
 
 ## API (all routes need `Authorization: Bearer <Cognito ID token>`)
 
+All four Cognito roles can read the shared practice financials, bills and documents. Write access is role-based: owner has full access (but cannot approve a bill they uploaded); ops can upload, review low-confidence fields/documents, mark goods received and import card transactions; partner can decide bills routed to Partner; `lpl_bookkeeper` is read-only. Rule changes are owner-only.
+
 | Method | Path | Body / query | Returns |
 |---|---|---|---|
-| POST | `/documents/upload-url` | `{filename, contentType}` (pdf/png/jpeg/tiff) | `{documentId, uploadUrl, s3Key, requiredHeaders}`: PUT the file to `uploadUrl` **with the same Content-Type** |
+| POST | `/documents/upload-url` | `{filename, contentType}` (pdf/png/jpeg/tiff) | owner/ops; `{documentId, uploadUrl, s3Key, requiredHeaders}`: PUT the file to `uploadUrl` **with the same Content-Type** |
 | GET | `/documents` | `?type=&q=` | `[{documentId, type, filename, status, vendorName, amount, billId, locked, createdAt}]` |
 | GET | `/documents/{id}` | | full doc + `viewUrl` (presigned, 15 min) |
-| POST | `/documents/{id}/resolve` | `{resolution: "dismiss" \| "accept", note?}` | closes a `needs_review` document: `dismiss` → `dismissed` (not a financial record; file stays in the library), `accept` → `processed`; records `review` + audit. 409 if not `needs_review`, already resolved, or it has a bill (use `/bills/{id}/confirm`). owner, ops, lpl_bookkeeper |
+| POST | `/documents/{id}/resolve` | `{resolution: "dismiss" \| "accept", note?}` | owner/ops; closes a `needs_review` document: `dismiss` → `dismissed` (not a financial record; file stays in the library), `accept` → `processed`; records `review` + audit. 409 if not `needs_review`, already resolved, or it has a bill (use `/bills/{id}/confirm`). |
 | GET | `/vendors` | | `[{vendorId, name, defaultGlAccount, hasW9, hasVoidCheck, bankLast4, billCount, bankDetailReviewRequired, possibleDuplicateVendorNames}]`; a last-four match is only a review candidate, not proof of a shared account |
 | GET | `/bills` | `?status=pending_approval,pending_docs` | bill summaries (newest first), including `glAccountReason` when supplied by ingest |
 | GET | `/bills/{id}` | | full bill incl. `glAccountReason`, `ruleHits`, `requiredApprovers`, `payment`, `audit[]` |
-| POST | `/bills/{id}/decision` | `{decision: "approve"\|"reject", comment}` | `{billId, status: "processing"}`; poll the bill for the final status |
-| POST | `/bills/{id}/confirm` | `{amount?, vendorName?\|vendorId?, glAccount?, dueDate?, invoiceNumber?, invoiceDate?}` | starts workflow |
-| POST | `/bills/{id}/receive` | | marks received, resumes a held bill |
+| POST | `/bills/{id}/decision` | `{decision: "approve"\|"reject", comment}` | owner or configured approver (Partner for partner-routed bills); uploader cannot approve; `{billId, status: "processing"}`; poll the bill for the final status |
+| POST | `/bills/{id}/confirm` | `{amount?, vendorName?\|vendorId?, glAccount?, dueDate?, invoiceNumber?, invoiceDate?}` | owner/ops; confirms low-confidence fields and starts workflow |
+| POST | `/bills/{id}/receive` | | owner/ops; marks received and resumes a held bill |
 | GET | `/rules` | | rules (defaults seeded on first call) |
 | POST | `/rules` | `{name, condition, action, approverRole?, priority?, reason?}` | owner only |
 | PATCH | `/rules/{id}` | e.g. `{"enabled": false}` | owner only |
-| POST | `/transactions/import` | raw CSV (`Content-Type: text/csv`): `Date, Description, Amount` (+ optional `Transaction ID`); sample in `scripts/sample_card_transactions.csv` | `{imported, alreadyImported, skipped, categorized, matchedReceipts, transactions[]}` with `categoryReason`; matches receipts on merchant + exact amount + date within 5 days; posts `j-card-<txnId>` (Dr expense / Cr 2100), idempotent; owner, ops, lpl_bookkeeper |
+| POST | `/transactions/import` | raw CSV (`Content-Type: text/csv`): `Date, Description, Amount` (+ optional `Transaction ID`); sample in `scripts/sample_card_transactions.csv` | owner/ops; `{imported, alreadyImported, skipped, categorized, matchedReceipts, transactions[]}` with `categoryReason`; matches receipts on merchant + exact amount + date within 5 days; posts `j-card-<txnId>` (Dr expense / Cr 2100), idempotent |
 | GET | `/financials` | `?period=2026-Q3` (or `2026-09`, `2026`) | `{period, pnl:{revenue, expenses, netIncome, monthly[6], categories, revenueLines, expenseLines}, balanceSheet:{assets, liabilities, equity, ...Lines}, cashFlow:{operating, investing, financing, net, ...}, kpis:{margin, recurringPct, revPerClient, expenseRatios, previous}, valuation:{low, mid, high, method, ...}}`; percentages 0–100, matching `frontend/lib/types.ts` (D) |
 | GET | `/revenue/reconciliation` | `?period=2026-09` | `{period, expected, actual, variance, lines:[{id, label, source, ref, expected, actual, variance, status, docId, reason?}], flags:[{id, reason, docId, lineId, status, severity}]}`; `status` = ok/short/over/missing/unexpected (D) |
 | POST | `/ask` | `{question}` | `{answer, citations:[{documentId, label, snippet}], period}` (D) |

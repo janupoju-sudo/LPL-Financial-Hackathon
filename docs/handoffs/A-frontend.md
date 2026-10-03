@@ -15,10 +15,10 @@ The backend for the core loop is built and tested: upload → bill → rules →
 
 | Who | Email | Role | Use in demo |
 |---|---|---|---|
-| Maya | maya@harborpoint.example | owner | Dashboard, uploads, can approve anything |
-| Raj | raj@harborpoint.example | partner | Approves bills over $1,000 |
-| Dev | dev@harborpoint.example | ops | Uploads and reviews; **can't approve** |
-| Priya | priya@lpl-demo.example | lpl_bookkeeper | Optional LPL view |
+| Maya | maya@harborpoint.example | owner | Full workspace access; can upload, review, manage rules and approve (except bills she uploaded herself) |
+| Raj | raj@harborpoint.example | partner | Can approve/reject bills routed to Partner; no uploads, bill-field review, imports or rule changes |
+| Dev | dev@harborpoint.example | ops | Can upload, review bill/document fields, mark goods received and import card transactions; **can't approve or manage rules** |
+| Priya | priya@lpl-demo.example | lpl_bookkeeper | Read-only access to financials, bills, documents and card transactions |
 
 **Role switcher tip:** keep two sessions (Maya + Raj) and swap tokens. Logging out mid-demo is slow.
 
@@ -41,18 +41,18 @@ Allowed types: `application/pdf`, `image/png`, `image/jpeg`, `image/tiff`.
 | `rejected` | Rejected (show `rejectionReason`) | — |
 
 - **Why it was routed:** render `ruleHits[].reason` as chips ("Amount is over $1,000", "Vendor is missing a W-9 or void check").
-- **Who can approve:** `requiredApprovers` (owner can always approve). Hide or disable the button for others. The API also enforces it.
+- **Who can approve:** `requiredApprovers` (owner can always approve, subject to the no-self-approval rule). Hide or disable the button for others. The API also enforces it.
 - **Approve/Reject:** `POST /bills/{id}/decision` `{decision, comment}` → `processing`. Poll `GET /bills/{id}` until `scheduled` or `rejected`.
 - **Errors to handle nicely:** `403` (wrong role, or approving a bill you uploaded, i.e. segregation of duties: a good demo line), `409` (someone already decided).
 - **Audit drawer:** `audit[]` = `{at, actor, action, detail}`, oldest first.
 - **Needs Review form:** `POST /bills/{id}/confirm` with any corrected fields: `amount, vendorName | vendorId, glAccount (6xxx), dueDate, invoiceNumber, invoiceDate`.
-- **Received button** (for held bills): `POST /bills/{id}/receive`.
+- **Received update** (for held bills): `POST /bills/{id}/receive` (owner or ops).
 - `payment` on a scheduled bill: `{method: "ACH (mock)", scheduledFor, confirmation, bankLast4}`.
 
 ## 4. Other pages
 - **Library:** `GET /documents?type=&q=`; `GET /documents/{id}` returns `viewUrl` (PDF preview, valid 15 min) and `locked: true` once Object Lock is applied. Show a 🔒 badge, judges like it.
 - **Vendors tab:** `GET /vendors`. Show W-9 / void check ✓/✗ and `billCount` ("Recognized vendor" = `billCount > 1`).
-- **Rules (P1):** `GET /rules`; owner can `POST /rules` and `PATCH /rules/{id}` `{"enabled": false}`.
+- **Rules (P1):** `GET /rules`; only owner can `POST /rules`, `PATCH /rules/{id}` `{"enabled": false}`, or delete rules.
 - **Dashboard / Revenue / Ask / Export:** these come from D (`/financials`, reconciliation, ask, export), not from these endpoints.
 
 ## 5. Money

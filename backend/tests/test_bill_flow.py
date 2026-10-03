@@ -62,6 +62,15 @@ def test_large_bill_partner_approval_and_permissions(aws):
     r = bills_api.handler(api_event("POST /bills/{id}/decision", path, {"decision": "approve"},
                                     groups=("ops",), sub="user-ops2"))
     assert r["statusCode"] == 403                                   # ops can't approve
+    r = bills_api.handler(api_event("POST /bills/{id}/decision", path, {"decision": "approve"},
+                                    groups=("lpl_bookkeeper",), sub="user-bookkeeper"))
+    assert r["statusCode"] == 403                                   # bookkeeper is read-only
+    repo.update_bill("p1", out["billId"], set_fields={"requiredApprovers": ["ops", "lpl_bookkeeper"]})
+    for group in ("ops", "lpl_bookkeeper"):
+        r = bills_api.handler(api_event("POST /bills/{id}/decision", path, {"decision": "approve"},
+                                        groups=(group,), sub=f"user-{group}"))
+        assert r["statusCode"] == 403                               # only owner/partner may ever approve
+    repo.update_bill("p1", out["billId"], set_fields={"requiredApprovers": ["partner"]})
 
     r = bills_api.handler(api_event("POST /bills/{id}/decision", path, {"decision": "approve"},
                                     groups=("partner",), sub="user-ops"))
@@ -120,8 +129,15 @@ def test_low_confidence_goes_to_review_then_confirm(aws):
                                "amount": 42.5, "confidence": 0.55})
     assert out["status"] == "pending_review" and not aws.started
 
+    path = {"id": out["billId"]}
+    for group in ("partner", "lpl_bookkeeper"):
+        denied = bills_api.handler(api_event("POST /bills/{id}/confirm", path,
+                                             {"amount": 45.10, "glAccount": "6700"},
+                                             groups=(group,)))
+        assert denied["statusCode"] == 403
+
     r = bills_api.handler(api_event("POST /bills/{id}/confirm", {"id": out["billId"]},
-                                    {"amount": 45.10, "glAccount": "6700"}))
+                                    {"amount": 45.10, "glAccount": "6700"}, groups=("ops",)))
     assert r["statusCode"] == 200, body_of(r)
     assert aws.started[-1]["billId"] == out["billId"]
     bill = repo.get_bill("p1", out["billId"])
@@ -129,6 +145,30 @@ def test_low_confidence_goes_to_review_then_confirm(aws):
 
     listed = body_of(bills_api.handler(api_event("GET /bills", query={"status": "processing"})))
     assert [b["billId"] for b in listed] == [out["billId"]]
+
+
+def test_marking_received_is_owner_or_ops_only(aws):
+    vendor = repo.create_vendor("p1", "Brightline Marketing", hasW9=False, hasVoidCheck=False)
+    doc = repo.create_document("p1", "brightline.pdf", "application/pdf", "k", "user-ops")
+    out = create_bill.handler({"documentId": doc["documentId"], "vendorId": vendor["vendorId"],
+                               "vendorName": vendor["name"], "amount": 600,
+                               "invoiceNumber": "BL-RECEIVED", "confidence": 0.9})
+    run_until_wait("p1", out["billId"])
+    path = {"id": out["billId"]}
+
+    for group in ("partner", "lpl_bookkeeper"):
+        denied = bills_api.handler(api_event("POST /bills/{id}/receive", path, groups=(group,)))
+        assert denied["statusCode"] == 403
+
+    partner_reject = bills_api.handler(api_event("POST /bills/{id}/decision", path,
+                                                 {"decision": "reject", "comment": "Not assigned"},
+                                                 groups=("partner",), sub="user-partner"))
+    assert partner_reject["statusCode"] == 403
+
+    allowed = bills_api.handler(api_event("POST /bills/{id}/receive", path, groups=("ops",)))
+    assert allowed["statusCode"] == 200
+    assert repo.get_bill("p1", out["billId"])["received"] is True
+    assert aws.resumed[-1][1]["decision"] == "reevaluate"
 
 
 def test_rules_api_seeds_defaults_and_owner_only_edits(aws):
@@ -147,6 +187,8 @@ def test_rules_api_seeds_defaults_and_owner_only_edits(aws):
     r = rules_api.handler(api_event("POST /rules", body=new_rule))
     assert r["statusCode"] == 201
     r = rules_api.handler(api_event("POST /rules", body={**new_rule, "action": "explode"}))
+    assert r["statusCode"] == 400
+    r = rules_api.handler(api_event("POST /rules", body={**new_rule, "approverRole": "ops"}))
     assert r["statusCode"] == 400
 
 

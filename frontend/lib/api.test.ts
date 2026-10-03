@@ -9,9 +9,34 @@ import { FinancialStatement } from '../components/financial-statements';
 import { Revenue } from '../components/revenue-view';
 import financialsFixture from '../mocks/financials.json';
 import reconciliationFixture from '../mocks/reconciliation.json';
-import type { Financials, Reconciliation } from './types';
+import type { Financials, Reconciliation, Role } from './types';
 import { normalizeBillDetail, normalizeFinancials, normalizeReconciliation, type LegacyFinancials } from './contracts';
 import { validateLocalApi } from './local-mode';
+import { canApproveBill, canImportTransactions, canManageRules, canReviewDocuments, canUploadDocuments } from './permissions';
+
+test('role capabilities match the practice permission policy', () => {
+  const ownerAndOps: Role[] = ['owner', 'ops'];
+  assert.deepEqual(ownerAndOps.filter(canUploadDocuments), ownerAndOps);
+  assert.deepEqual(ownerAndOps.filter(canReviewDocuments), ownerAndOps);
+  assert.deepEqual(ownerAndOps.filter(canImportTransactions), ownerAndOps);
+  assert.equal(canManageRules('owner'), true);
+  for (const role of ['partner', 'lpl_bookkeeper'] as const) {
+    assert.equal(canUploadDocuments(role), false);
+    assert.equal(canReviewDocuments(role), false);
+    assert.equal(canImportTransactions(role), false);
+    assert.equal(canManageRules(role), false);
+  }
+  assert.equal(canManageRules('ops'), false);
+  assert.equal(canUploadDocuments('ops'), true);
+  assert.equal(canReviewDocuments('ops'), true);
+  assert.equal(canImportTransactions('ops'), true);
+  assert.equal(canApproveBill('owner', ['partner'], 'uploader', 'owner-user'), true);
+  assert.equal(canApproveBill('owner', ['partner'], 'owner-user', 'owner-user'), false);
+  assert.equal(canApproveBill('partner', ['partner'], 'uploader', 'partner-user'), true);
+  assert.equal(canApproveBill('partner', ['owner'], 'uploader', 'partner-user'), false);
+  assert.equal(canApproveBill('ops', ['ops'], 'uploader', 'ops-user'), false);
+  assert.equal(canApproveBill('lpl_bookkeeper', ['lpl_bookkeeper'], 'uploader', 'bookkeeper'), false);
+});
 
 test('approval enforces role, unblocks on vendor documents, and updates balanced financials', async () => {
   const before = await api.financials('2026-Q3');
