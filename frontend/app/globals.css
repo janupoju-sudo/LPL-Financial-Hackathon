@@ -248,6 +248,8 @@ nav { display: grid; gap: 4px; }
 .alert strong { color: var(--ink); }
 .alert.error { border-color: color-mix(in srgb, var(--bad) 22%, transparent); background: var(--bad-soft); color: var(--bad); }
 .alert .button { flex-shrink: 0; }
+.alert.awaiting { background: var(--glass); border-color: var(--glass-line); color: var(--ink); }
+.kpi-value.muted { color: var(--muted); }
 .skeleton-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
 .skeleton { min-height: 160px; border-radius: var(--r-xl); background: linear-gradient(90deg, var(--glass) 0%, var(--glass-strong) 50%, var(--glass) 100%); background-size: 200% 100%; animation: shimmer 1.4s infinite linear; }
 .summary-strip { display: flex; gap: 10px; flex-wrap: wrap; margin: 0 0 18px; color: var(--muted); font-size: 13px; }
