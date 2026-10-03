@@ -36,18 +36,25 @@ DESCRIPTION_COLUMNS = ("description", "merchant", "payee", "name")
 AMOUNT_COLUMNS = ("amount", "debit")
 ID_COLUMNS = ("transaction id", "transactionid", "id", "reference")
 
-# Merchant keyword -> expense account. Checked in order; first hit wins.
+# Merchant keyword -> expense sub-account (see shared/coa.py). Checked in order; first hit wins.
 KEYWORDS = [
     # Marketing first so "Google Ads" / "LinkedIn Ads" don't fall into Technology.
     (("linkedin", "facebook", "meta ads", "google ads", "mailchimp", "vistaprint", "brightline",
-      "marketing"), "6500"),
+      "marketing"), "6520"),
     (("zoom", "microsoft", "google", "adobe", "aws", "dropbox", "slack", "docusign", "salesforce",
-      "redtail", "orion", "riskalyze", "emoney", "software"), "6300"),
-    (("delta", "united", "american air", "southwest", "jetblue", "airline", "air", "marriott", "hilton",
-      "hyatt", "hotel", "cafe", "restaurant", "uber", "lyft", "taxi", "amtrak", "hertz", "avis", "parking"), "6700"),
-    (("finra", "sec", "nasaa", "cfp board", "compliance", "smarsh"), "6600"),
-    (("lpl",), "6400"),
-    (("wework", "regus", "rent"), "6200"),
+      "redtail", "orion", "riskalyze", "emoney", "software"), "6310"),
+    (("morningstar", "bloomberg", "factset", "ycharts"), "6320"),
+    (("parking", "parkwhiz", "spothero"), "6740"),
+    (("delta", "united", "american air", "southwest", "jetblue", "airline", "air"), "6710"),
+    (("uber", "lyft", "taxi", "cab"), "6720"),
+    (("amtrak", "hertz", "avis", "enterprise rent", "metro", "transit"), "6730"),
+    (("marriott", "hilton", "hyatt", "hotel"), "6750"),
+    (("cafe", "restaurant", "grill", "coffee"), "6760"),
+    (("finra", "nasaa", "cfp board"), "6610"),
+    (("sec", "compliance", "smarsh"), "6600"),
+    (("lpl",), "6410"),
+    (("wework", "regus", "rent"), "6210"),
+    (("staples", "office depot"), "6910"),
 ]
 
 

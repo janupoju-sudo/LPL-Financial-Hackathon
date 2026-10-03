@@ -13,15 +13,15 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 # Fictional demo vendors. Keep the four workflow names and onboarding flags stable.
 DEMO_VENDORS = (
-    ("Orion Software LLC", "6300", True, True, "4821"),
+    ("Orion Software LLC", "6310", True, True, "4821"),
     ("Seaport Office Partners", "6200", True, True, "1190"),
-    ("LPL Financial", "6400", True, True, "0007"),
-    ("Brightline Marketing", "6500", False, False, None),
+    ("LPL Financial", "6410", True, True, "0007"),
+    ("Brightline Marketing", "6520", False, False, None),
     ("Clearwater Compliance Advisors (FICTIONAL)", "6600", True, True, "8623"),
-    ("Horizon Managed IT LLC", "6300", True, True, "4142"),
-    ("Oakridge Payroll Services", "6100", True, True, "7734"),
-    ("Pinecrest Office Supply LLC", "6900", True, True, "6285"),
-    ("Waypoint Business Travel LLC", "6700", True, True, "9056"),
+    ("Horizon Managed IT LLC", "6330", True, True, "4142"),
+    ("Oakridge Payroll Services", "6110", True, True, "7734"),
+    ("Pinecrest Office Supply LLC", "6910", True, True, "6285"),
+    ("Waypoint Business Travel LLC", "6710", True, True, "9056"),
 )
 
 

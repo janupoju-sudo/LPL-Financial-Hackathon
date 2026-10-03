@@ -40,8 +40,8 @@ def test_import_categorizes_and_posts_balanced_journals(aws):
     assert body["skipped"] == 1
     assert body["categorized"] == 3             # Zoom (keyword), Delta (keyword), Orion (vendor memory)
     by_desc = {t["description"]: t for t in body["transactions"]}
-    assert by_desc["ZOOM.US 888-799-9666"]["glAccount"] == "6300"
-    assert by_desc["DELTA AIR 0062345"]["glAccount"] == "6700"
+    assert by_desc["ZOOM.US 888-799-9666"]["glAccount"] == "6310"
+    assert by_desc["DELTA AIR 0062345"]["glAccount"] == "6710"
     assert by_desc["Orion Software license"]["glAccount"] == "6300"
     assert by_desc["Orion Software license"]["categorizedBy"] == "vendor"
     assert "vendor memory" in by_desc["Orion Software license"]["categoryReason"]
@@ -117,7 +117,7 @@ def test_accepts_base64_body_and_alternate_headers(aws):
     assert status == 200
     assert body["imported"] == 1
     assert body["transactions"][0]["date"] == "2026-09-20"
-    assert body["transactions"][0]["glAccount"] == "6700"
+    assert body["transactions"][0]["glAccount"] == "6750"
 
 
 def test_rejects_bad_csv_and_wrong_role(aws):
@@ -136,6 +136,6 @@ def test_list_transactions_reads_imported_charges(aws):
     assert [t["description"] for t in txns][:1] == ["CORNER DELI"]  # newest first
     assert len(txns) == 4  # the payment row is skipped on import
     zoom = next(t for t in txns if t["description"].startswith("ZOOM"))
-    assert (zoom["amount"], zoom["glAccount"], zoom["glAccountName"]) == (149.9, "6300", "Technology")
+    assert (zoom["amount"], zoom["glAccount"], zoom["glAccountName"]) == (149.9, "6310", "Software subscriptions")
     assert "keyword" in zoom["categoryReason"]
     assert zoom["journalId"].startswith("j-card-")

@@ -43,6 +43,18 @@ SEASONAL = {
     "6500": {1: 1.8, 9: 1.8, 12: 0.7},
     "6700": {5: 2.2, 10: 2.2, 1: 0.5, 2: 0.5},
 }
+# Subledger split for the monthly operating-expense journal: each category's amount is spread
+# over its sub-accounts (shares sum to 1; the last one takes the rounding cents). Rent (6200) and
+# compliance (6600) stay on their category codes because reset_demo.py keys on them.
+SUBLEDGER_SPLIT = {
+    "6100": (("6110", 0.82), ("6120", 0.07), ("6130", 0.11)),
+    "6300": (("6310", 0.70), ("6320", 0.22), ("6330", 0.08)),
+    "6400": (("6410", 0.80), ("6420", 0.20)),
+    "6500": (("6510", 0.35), ("6520", 0.45), ("6530", 0.20)),
+    "6700": (("6710", 0.45), ("6720", 0.12), ("6730", 0.08), ("6740", 0.05), ("6750", 0.20),
+             ("6760", 0.10)),
+    "6900": (("6910", 0.60), ("6920", 0.40)),
+}
 DECEMBER_BONUS = 25_000
 MONTHLY_DISTRIBUTION = 30_000
 OPENING_CASH = 150_000
@@ -91,6 +103,25 @@ def expenses_for(year, month):
         out["6200"] = 12_200
         out["6600"] += 2_550
     return {account: round(amount, 2) for account, amount in out.items()}
+
+
+def operating_expense_lines(expenses):
+    """Debit lines for the monthly operating-expense journal, split into sub-accounts."""
+    from shared import ledger
+
+    lines = []
+    for account, amount in sorted(expenses.items()):
+        cents = ledger.to_cents(amount)
+        split = SUBLEDGER_SPLIT.get(account)
+        if not split:
+            lines.append({"account": account, "debit": cents})
+            continue
+        left = cents
+        for i, (sub, share) in enumerate(split):
+            part = left if i == len(split) - 1 else round(cents * share)
+            left -= part
+            lines.append({"account": sub, "debit": part})
+    return lines
 
 
 def payout_revenue_lines(year, month, doc_id, fallback=False):
@@ -263,10 +294,7 @@ def build(include_sept=False, live_sept=False):
             rent = expenses.pop("6200")
             compliance = expenses.pop("6600")
         total = sum(ledger.to_cents(amount) for amount in expenses.values())
-        expense_lines = [
-            {"account": account, "debit": ledger.to_cents(amount)}
-            for account, amount in sorted(expenses.items())
-        ]
+        expense_lines = operating_expense_lines(expenses)
         expense_lines.append({"account": coa.ACCOUNTS_PAYABLE, "credit": total})
         out.append((f"j-expenses-{tag}", entry_date, expense_lines,
                     f"Operating expenses {tag}", None))
@@ -293,8 +321,7 @@ def build(include_sept=False, live_sept=False):
         rent = expenses.pop("6200")
         compliance = expenses.pop("6600")
         total = sum(ledger.to_cents(amount) for amount in expenses.values())
-        lines = [{"account": account, "debit": ledger.to_cents(amount)}
-                 for account, amount in sorted(expenses.items())]
+        lines = operating_expense_lines(expenses)
         lines.append({"account": coa.ACCOUNTS_PAYABLE, "credit": total})
         out.extend([
             (f"j-expenses-{tag}", entry_date, lines, f"Operating expenses {tag}", None),

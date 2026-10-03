@@ -24,16 +24,16 @@ OPS = "dev@harborpoint.example"
 
 # (vendor name, gl, invoice number, invoice date, amount, documentId or None)
 HISTORY = [
-    ("Orion Software LLC", "6300", "ORN-2026-06", "2026-06-02", 450.00, None),
-    ("Orion Software LLC", "6300", "ORN-2026-07", "2026-07-02", 450.00, None),
-    ("Orion Software LLC", "6300", "ORN-2026-07A", "2026-07-15", 1850.00, None),
-    ("Orion Software LLC", "6300", "ORN-2026-08", "2026-08-03", 450.00, None),
+    ("Orion Software LLC", "6310", "ORN-2026-06", "2026-06-02", 450.00, None),
+    ("Orion Software LLC", "6310", "ORN-2026-07", "2026-07-02", 450.00, None),
+    ("Orion Software LLC", "6310", "ORN-2026-07A", "2026-07-15", 1850.00, None),
+    ("Orion Software LLC", "6310", "ORN-2026-08", "2026-08-03", 450.00, None),
     ("Seaport Office Partners", "6200", "SOP-0626", "2026-06-01", 9800.00, None),
     ("Seaport Office Partners", "6200", "SOP-0726", "2026-07-01", 12200.00, None),
     ("Seaport Office Partners", "6200", "SOP-0826", "2026-08-01", 12200.00, None),
-    ("LPL Financial", "6400", "LPL-PF-2606", "2026-06-28", 21500.00, None),
-    ("LPL Financial", "6400", "LPL-PF-2607", "2026-07-28", 21500.00, None),
-    ("LPL Financial", "6400", "LPL-PF-2608", "2026-08-28", 21500.00, None),
+    ("LPL Financial", "6410", "LPL-PF-2606", "2026-06-28", 21500.00, None),
+    ("LPL Financial", "6410", "LPL-PF-2607", "2026-07-28", 21500.00, None),
+    ("LPL Financial", "6410", "LPL-PF-2608", "2026-08-28", 21500.00, None),
     ("Clearwater Compliance Advisors (FICTIONAL)", "6600", "CCA-2607", "2026-07-05", 2550.00,
      "doc_compliance_invoice_2026_07"),
     ("Clearwater Compliance Advisors (FICTIONAL)", "6600", "CCA-2608", "2026-08-05", 2550.00,

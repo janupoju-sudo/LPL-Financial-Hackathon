@@ -108,6 +108,12 @@ class IngestValidationTests(unittest.TestCase):
                 },
             )
 
+    def test_sub_account_codes_are_kept_and_unknown_ones_fall_back(self) -> None:
+        base = {"confidence": 0.9, "vendorConfidence": 0.9, "lineItems": []}
+        self.assertEqual(normalize_invoice("receipt", {**base, "glAccount": "6740"})["glAccount"], "6740")
+        self.assertEqual(normalize_invoice("receipt", {**base, "glAccount": "6790"})["glAccount"], "6700")
+        self.assertIsNone(normalize_invoice("receipt", {**base, "glAccount": "6890"})["glAccount"])
+
     def test_low_vendor_confidence_lowers_bill_confidence(self) -> None:
         result = normalize_invoice(
             "receipt",

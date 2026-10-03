@@ -41,6 +41,27 @@ def check_balanced(entries) -> None:
         raise ValueError(f"Unbalanced journals (debit − credit, cents): {bad}")
 
 
+def _expense_categories(by_acct) -> list[dict]:
+    """One line per expense category with its total, and `children` with the sub-account breakdown.
+
+    Money posted straight to a category code (older history) shows as that category's "General"
+    line when the category also has sub-account activity.
+    """
+    groups = defaultdict(dict)
+    for code, v in by_acct.items():
+        if coa.get(code).type == "expense" and v:
+            groups[coa.category(code)][code] = v
+    out = []
+    for cat in sorted(groups):
+        amounts = groups[cat]
+        subs = sorted(c for c in amounts if c != cat)
+        children = [_line(c, amounts[c]) for c in subs]
+        if subs and cat in amounts:
+            children.insert(0, {"account": cat, "name": "General", "amount": amounts[cat]})
+        out.append({**_line(cat, sum(amounts.values())), "children": children})
+    return out
+
+
 def profit_and_loss(entries, period: str) -> dict:
     start, end = periods.parse(period)
     by_acct = defaultdict(int)
@@ -49,8 +70,7 @@ def profit_and_loss(entries, period: str) -> dict:
 
     revenue = [_line(c, -v) for c, v in sorted(by_acct.items())
                if coa.get(c).type == "revenue" and v]
-    expenses = [_line(c, v) for c, v in sorted(by_acct.items())
-                if coa.get(c).type == "expense" and v]
+    expenses = _expense_categories(by_acct)
     total_rev = sum(l["amount"] for l in revenue)
     total_exp = sum(l["amount"] for l in expenses)
     return {
