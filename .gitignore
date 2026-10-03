@@ -19,3 +19,4 @@ samconfig.toml
 backend/.dev-exports/
 !.env.example
 !.env.live.example
+.superpowers/

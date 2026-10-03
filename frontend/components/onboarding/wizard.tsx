@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { ArrowLeft, ArrowRight, Check } from 'lucide-react';
 import { OtterLogo } from '../brand';
+import { OtterPeek } from '../otter-peek';
+import { ShaderBg } from '../shader-bg';
 import { spring, stepVariants } from '../motion';
 import { type Answers, DEFAULT_ANSWERS, STEPS, STORAGE_KEY, stepProblem } from './data';
 import { BusinessStep, DocumentsStep, PracticeStep, ReadyScreen, RulesStep, SetupScreen, TeamStep } from './steps';
@@ -50,7 +52,7 @@ export function OnboardingWizard({ live, onFinish, onSignIn, onExit }: { live: b
 
   return (
     <div className="ob-shell">
-      <div className="ob-blobs" aria-hidden><span /><span /><span /></div>
+      <ShaderBg animated />
       <header className="ob-top">
         <button type="button" className="ob-logo-btn" onClick={onExit} aria-label="Back to the Otter home page"><OtterLogo height={26} /></button>
         <div className="ob-top-links">
@@ -60,6 +62,8 @@ export function OnboardingWizard({ live, onFinish, onSignIn, onExit }: { live: b
       </header>
 
       <main className="ob-main">
+        <div className="ob-card-wrap">
+        {phase === 'ready' && <OtterPeek size={80} right={48} delay={0.9} />}
         <motion.div className="ob-card" layout transition={spring}>
           <div className="ob-progress" aria-hidden><motion.span animate={{ width: `${progress * 100}%` }} transition={spring} /></div>
 
@@ -96,6 +100,7 @@ export function OnboardingWizard({ live, onFinish, onSignIn, onExit }: { live: b
             {phase === 'ready' && <motion.div key="ready" className="ob-body" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}><ReadyScreen answers={answers} onOpen={finish} live={live} /></motion.div>}
           </AnimatePresence>
         </motion.div>
+        </div>
         <p className="ob-foot">Demo onboarding · SAMPLE — FICTIONAL DATA · Already have an account? <button type="button" className="ob-link strong" onClick={onSignIn}>Sign in</button></p>
       </main>
     </div>
