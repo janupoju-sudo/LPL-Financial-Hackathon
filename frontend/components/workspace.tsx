@@ -18,6 +18,7 @@ import { percent } from '@/lib/format';
 import { ProfileSettings } from './profile-settings';
 import { ShaderBg } from './shader-bg';
 import { OtterPeek } from './otter-peek';
+import { PressFeedback, RevealOnScroll } from './motion-effects';
 import { GoogleDriveImport } from './google-drive-import';
 import { canApproveBill, canImportTransactions, canManageRules, canReviewDocuments, canUploadDocuments } from '@/lib/permissions';
 import { Landing } from './landing';
@@ -28,7 +29,14 @@ import { OtterLogo, OtterMark } from './brand';
 const money = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n);
 function Amount({ value }: { value: number }) { const [whole, frac] = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value).split('.'); return <>{whole}<small>.{frac}</small></>; }
 const cents = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n);
-const label = (s?: string | null) => s ? s.replaceAll('_', ' ').replace(/\b\w/g, c => c.toUpperCase()) : '';
+const label = (s?: string | null) => s ? s.replace(/([a-z])([A-Z])/g, '$1 $2').replaceAll('_', ' ').replace(/\b\w/g, c => c.toUpperCase()) : '';
+// Extracted fields arrive as raw values: show line items as a list, confidences as %, amounts as money.
+function FieldValue({ name, value }: { name: string; value: unknown }) {
+  if (Array.isArray(value) && value.every(v => v && typeof v === 'object')) return <ul className="line-items">{(value as Record<string, unknown>[]).map((item, i) => <li key={i}><span>{String(item.description ?? item.name ?? `Item ${i + 1}`)}</span>{typeof item.amount === 'number' && <span className="mono">{cents(item.amount)}</span>}</li>)}</ul>;
+  if (typeof value === 'number' && /confidence/i.test(name) && value <= 1) return <>{Math.round(value * 100)}%</>;
+  if (typeof value === 'number' && /amount|total|subtotal|tax/i.test(name)) return <span className="mono">{cents(value)}</span>;
+  return <>{typeof value === 'object' && value !== null ? JSON.stringify(value) : String(value)}</>;
+}
 // Four places. Money out and Documents each hold a few pages, shown as tabs inside the place.
 const nav = [
   { name: 'Home', path: '/', icon: Home, match: ['/'] },
@@ -48,9 +56,9 @@ const authConfigured = Boolean(process.env.NEXT_PUBLIC_COGNITO_USER_POOL_ID && p
 if (authConfigured) Amplify.configure({ Auth: { Cognito: { userPoolId: process.env.NEXT_PUBLIC_COGNITO_USER_POOL_ID!, userPoolClientId: process.env.NEXT_PUBLIC_COGNITO_CLIENT_ID! } } });
 
 export function Workspace() {
-  if (USE_MOCKS || USE_LOCAL_API) return <MotionConfig reducedMotion="user"><MockGate /></MotionConfig>;
+  if (USE_MOCKS || USE_LOCAL_API) return <MotionConfig reducedMotion="user"><PressFeedback /><MockGate /></MotionConfig>;
   if (!authConfigured) return <main className="login"><OtterMark size={40} /><h1>Connect your practice</h1><p>Set the Cognito user pool and client ID in frontend/.env.local to enable secure sign-in.</p></main>;
-  return <MotionConfig reducedMotion="user"><Authenticator.Provider><AuthGate /></Authenticator.Provider></MotionConfig>;
+  return <MotionConfig reducedMotion="user"><PressFeedback /><Authenticator.Provider><AuthGate /></Authenticator.Provider></MotionConfig>;
 }
 
 // Signed-out pages. The landing page and wizard are a demo of onboarding: no account is created
@@ -183,6 +191,7 @@ function App({ signOut }: { signOut?: () => void }) {
   ], [bills, docs, period, openAsk, router, canUpload, canReview, role, roleLoaded, userId, exportPackage, openBill, openDoc]);
   return <div className="app-shell">
     <ShaderBg />
+    <RevealOnScroll path={path} />
     <aside className="sidebar">
       <Link className="brand" href="/"><span className="brand-icon otter"><OtterMark size={30} /></span><span><strong>Otter</strong><small>Harbor Point Wealth</small></span></Link>
       <nav aria-label="Main">{nav.map(item => { const active = isActive(item.match, path); const count = counts[item.path] ?? 0; return <Link className={`nav-item ${active ? 'active' : ''}`} aria-current={active ? 'page' : undefined} href={item.path} key={item.path}><item.icon size={19} /><span>{item.name}</span>{count > 0 && <span className="nav-count" aria-label={`${count} need attention`}>{count}</span>}</Link>; })}</nav>
@@ -403,7 +412,7 @@ function ResolveDocument({ doc, role, notify, onResolved }: { doc: Document; rol
     </> : <p className="muted">Document review is done by Operations or the owner. Partners approve bills.</p>}
   </div>;
 }
-function DocumentDetail({ doc, vendors, role, notify, onResolved }: { doc: Document; vendors: Vendor[]; role?: Role; notify?: (text: string) => void; onResolved?: (doc: Document) => void }) { const recognized = vendors.find(v => v.name === doc.vendorName && v.billCount > 1); return <div className="document-detail"><div className="preview">{doc.viewUrl ? doc.viewUrl.startsWith('blob:') && /\.(png|jpe?g)$/i.test(doc.filename) ? <img src={doc.viewUrl} alt={doc.filename} /> : <iframe title={`Preview of ${doc.filename}`} src={doc.viewUrl} /> : <Empty text="Preview is not available yet." />}</div><section className="extracted"><div className="eyebrow">{USE_LOCAL_API ? 'SOURCE METADATA' : 'EXTRACTED INFORMATION'}</div><h2>{doc.vendorName || label(doc.type)}</h2><div className="document-badges"><Pill status={doc.status} />{!USE_LOCAL_API && typeof doc.confidence === 'number' && <span className={`pill ${doc.confidence >= .8 ? 'processed' : 'pending_review'}`}>{Math.round(doc.confidence * 100)}% confidence</span>}</div>{recognized && <div className="recognized"><Check size={15} />Recognized vendor · {recognized.billCount} prior bills</div>}{!USE_LOCAL_API && doc.status === 'needs_review' && !doc.billId ? <ResolveDocument doc={doc} role={role} notify={notify} onResolved={onResolved} /> : !USE_LOCAL_API && doc.status === 'needs_review' && typeof doc.confidence === 'number' && doc.confidence < .8 && <div className="alert">Low confidence. Operations should verify these fields before bill creation or approval.</div>}<dl>{Object.entries(doc.extracted ?? {}).map(([key, value]) => <div key={key}><dt>{label(key)}</dt><dd>{typeof value === 'object' ? JSON.stringify(value) : String(value)}</dd></div>)}</dl>{doc.viewUrl && <a className="document-link" href={doc.viewUrl} target="_blank" rel="noreferrer">Open original <ArrowUpRight size={14} /></a>}{USE_LOCAL_API && <small className="table-sub">D?s local server provides source metadata but no document previews.</small>}{USE_MOCKS && !USE_LOCAL_API && <small className="table-sub">Seed previews are fictional sample documents; uploaded previews show your file with simulated extracted fields.</small>}</section></div>; }
+function DocumentDetail({ doc, vendors, role, notify, onResolved }: { doc: Document; vendors: Vendor[]; role?: Role; notify?: (text: string) => void; onResolved?: (doc: Document) => void }) { const recognized = vendors.find(v => v.name === doc.vendorName && v.billCount > 1); return <div className="document-detail"><div className="preview">{doc.viewUrl ? doc.viewUrl.startsWith('blob:') && /\.(png|jpe?g)$/i.test(doc.filename) ? <img src={doc.viewUrl} alt={doc.filename} /> : <iframe title={`Preview of ${doc.filename}`} src={doc.viewUrl} /> : <Empty text="Preview is not available yet." />}</div><section className="extracted"><div className="eyebrow">{USE_LOCAL_API ? 'SOURCE METADATA' : 'EXTRACTED INFORMATION'}</div><h2>{doc.vendorName || label(doc.type)}</h2><div className="document-badges"><Pill status={doc.status} />{!USE_LOCAL_API && typeof doc.confidence === 'number' && <span className={`pill ${doc.confidence >= .8 ? 'processed' : 'pending_review'}`}>{Math.round(doc.confidence * 100)}% confidence</span>}</div>{recognized && <div className="recognized"><Check size={15} />Recognized vendor · {recognized.billCount} prior bills</div>}{!USE_LOCAL_API && doc.status === 'needs_review' && !doc.billId ? <ResolveDocument doc={doc} role={role} notify={notify} onResolved={onResolved} /> : !USE_LOCAL_API && doc.status === 'needs_review' && typeof doc.confidence === 'number' && doc.confidence < .8 && <div className="alert">Low confidence. Operations should verify these fields before bill creation or approval.</div>}<dl>{Object.entries(doc.extracted ?? {}).map(([key, value]) => <div key={key}><dt>{label(key)}</dt><dd><FieldValue name={key} value={value} /></dd></div>)}</dl>{doc.viewUrl && <a className="document-link" href={doc.viewUrl} target="_blank" rel="noreferrer">Open original <ArrowUpRight size={14} /></a>}{USE_LOCAL_API && <small className="table-sub">D?s local server provides source metadata but no document previews.</small>}{USE_MOCKS && !USE_LOCAL_API && <small className="table-sub">Seed previews are fictional sample documents; uploaded previews show your file with simulated extracted fields.</small>}</section></div>; }
 
 const DONE_STATUSES = ['processed', 'completed', 'ready'];
 // No payout statement for the month yet: one thing to do (upload it), not one flag per revenue line.
@@ -512,6 +521,6 @@ function BillDrawer({ bill, role, userId, busy: deciding, onDecide, onClose, onC
         </div>}
       </div>
     </div>
-    <h3 className="audit-heading">History</h3>{bill.audit.length ? <ol className="audit-trail">{bill.audit.map((a, i) => <li key={i}><div><strong>{label(a.action)}</strong> <span className="muted">by {a.actor}</span></div><small className="muted">{new Date(a.at).toLocaleString()}</small>{a.detail && <p>{a.detail}</p>}</li>)}</ol> : <p className="muted">No history recorded yet.</p>}
+    <h3 className="audit-heading">History</h3>{bill.audit.length ? <ol className="audit-trail">{bill.audit.map((a, i) => <li key={i}><div><strong>{label(a.action)}</strong> <span className="muted">by {a.actor.replace('Ledgerline', 'Otter')}</span></div><small className="muted">{new Date(a.at).toLocaleString()}</small>{a.detail && <p>{a.detail}</p>}</li>)}</ol> : <p className="muted">No history recorded yet.</p>}
   </section></div>;
 }

@@ -791,3 +791,29 @@ td.nowrap { white-space: nowrap; }
 [data-amplify-authenticator] .amplify-input::placeholder { color: var(--faint); }
 [data-amplify-authenticator] .amplify-input:focus { border-color: var(--ink); box-shadow: 0 0 0 3px var(--hover); }
 [data-amplify-authenticator] .amplify-field-group__outer-end .amplify-button { color: var(--ink-2); background: var(--surface); border-color: var(--line-strong); }
+
+/* ── Polish pass ─────────────────────────────────────────────────────────── */
+/* Selects: our own chevron with room to breathe (the native arrow sat against the edge). */
+select { -webkit-appearance: none; appearance: none; padding: 0 40px 0 16px; cursor: pointer; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%237d7466' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 15px center; background-size: 12px; }
+:root[data-theme="dark"] select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23a0947f' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); }
+
+/* File inputs (card statement import): a real pill button instead of the browser's grey box. */
+input[type="file"] { padding: 6px; cursor: pointer; color: var(--muted); font-size: 13px; }
+input[type="file"]::file-selector-button { height: 32px; margin-right: 12px; padding: 0 16px; border: 0; border-radius: 999px; background: var(--accent); color: var(--accent-ink); font: 500 13px var(--font); cursor: pointer; }
+input[type="file"]::file-selector-button:hover { filter: brightness(1.12); }
+
+/* Home "Recent bills": every cell lines up with the vendor avatar. */
+.recent-panel td { vertical-align: middle; }
+
+/* Extracted line items in document details. */
+.line-items { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; }
+.line-items li { display: flex; justify-content: space-between; gap: 12px; }
+
+/* Phones: tab bars scroll sideways instead of wrapping; wide tables scroll instead of squashing. */
+@media (max-width: 860px) {
+  .subnav, .documents-tabs { display: flex; flex-wrap: nowrap; max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+  .subnav a, .documents-tabs button { flex-shrink: 0; white-space: nowrap; }
+  .table-scroll table { min-width: 640px; }
+  .content { padding-bottom: 96px; }
+}
+@media (max-width: 600px) { .ob-range-ends span:nth-child(4) { display: none; } }
