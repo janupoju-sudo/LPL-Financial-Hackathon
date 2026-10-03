@@ -113,12 +113,12 @@ test('live API payloads (C backend shape) normalize to frontend types', async ()
   assert.equal('documentId' in doc, false);
   const bill = normalizeBill({
     billId: 'bill-1', documentId: 'doc-1', vendorId: 'ven-1', vendorName: 'Brightline Marketing', amount: 650, dueDate: '2026-10-18',
-    glAccount: '6500', glAccountName: 'Marketing', status: 'pending_approval',
+    glAccount: '6500', glAccountName: 'Marketing', glAccountReason: "Matched vendor memory: Brightline Marketing uses expense account 6500.", status: 'pending_approval',
     ruleHits: [{ ruleId: 'r-docs', name: 'Vendor docs', action: 'hold', reason: 'Vendor is missing a W-9 or void check' }, 'Legacy text hit'],
   });
   assert.deepEqual(bill, {
     id: 'bill-1', docId: 'doc-1', vendor: 'Brightline Marketing', vendorId: 'ven-1', amount: 650, dueDate: '2026-10-18',
-    glAccount: '6500 · Marketing', status: 'pending_approval', ruleHits: ['Vendor is missing a W-9 or void check', 'Legacy text hit'],
+    glAccount: '6500 · Marketing', glAccountReason: "Matched vendor memory: Brightline Marketing uses expense account 6500.", status: 'pending_approval', ruleHits: ['Vendor is missing a W-9 or void check', 'Legacy text hit'],
   });
   assert.ok(bill.ruleHits.some(hit => hit.includes('missing')));   // the approve-button guard still works
   assert.equal(normalizeVendor({ vendorId: 'ven-1', name: 'Orion', defaultGlAccount: '6300', hasW9: true, hasVoidCheck: true, billCount: 2 }).id, 'ven-1');

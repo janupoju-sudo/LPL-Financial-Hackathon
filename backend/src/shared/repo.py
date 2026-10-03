@@ -188,7 +188,7 @@ def is_duplicate_invoice(practice_id, vendor_id, invoice_number, exclude_bill_id
 
 def bill_summary(bill: dict) -> dict:
     keys = ("billId", "documentId", "vendorId", "vendorName", "invoiceNumber", "invoiceDate", "dueDate",
-            "amount", "currency", "glAccount", "glAccountName", "status", "ruleHits", "requiredApprovers",
+            "amount", "currency", "glAccount", "glAccountName", "glAccountReason", "status", "ruleHits", "requiredApprovers",
             "confidence", "createdAt", "updatedAt")
     return from_ddb({k: bill.get(k) for k in keys if k in bill})
 

@@ -49,13 +49,13 @@ Dependencies are noted as `← B3` (wait on, or mock, that task).
 - [x] B5. `match_vendor` Lambda: exact/alias → fuzzy match (e.g. `rapidfuzz`); set `defaultGlAccount` from history; create the vendor if new ← C3
 - [x] B6. Step Functions `IngestDocument` ASL: classify → branch → normalize → match → create Bill / RevenueLines → start `ApproveBill` ← C4
 - [x] B7. EventBridge rule: S3 `Object Created` in `uploads/` → start `IngestDocument` ← E3
-- [ ] B8. Test on **all seed docs** (E5); tune prompts until every demo doc extracts correctly
+- [ ] B8. Test on **all seed docs** (E5); tune prompts until every demo doc extracts correctly — blocked on C confirming the shared live-upload session
 - [x] B9. Void check / W-9 → update vendor `hasVoidCheck`, `hasW9`, `bankLast4`
 
 **P1**
-- [ ] B10. Duplicate/suspicious vendor flag (same bank details, different vendor name)
-- [ ] B11. Receipt ↔ card transaction matching (amount + date + merchant)
-- [ ] B12. GL account suggestion with a reason string ("Matched prior invoices from this vendor")
+- [HM] B10. Flag possible shared bank details across vendor names using matching last four digits; human verification required
+- [HM] B11. Receipt ↔ card transaction matching (merchant + amount + date)
+- [HM] B12. Explain GL account selection from invoice extraction or vendor memory
 
 ---
 

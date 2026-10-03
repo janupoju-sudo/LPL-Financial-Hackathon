@@ -10,6 +10,7 @@ Input (from the IngestDocument state machine or a direct Lambda invoke):
   "currency": "USD",
   "invoiceNumber": "INV-2041", "invoiceDate": "2026-09-28", "dueDate": "2026-10-28",
   "glAccount": "6300",                   # optional 6xxx code; falls back to vendor default
+  "glAccountReason": "Matched vendor memory: Orion Software LLC uses expense account 6300.",
   "lineItems": [{"description": "...", "amount": 1850.00}],
   "confidence": 0.93,                    # < REVIEW_CONFIDENCE_THRESHOLD -> pending_review
   "requiresReceipt": false
@@ -56,6 +57,7 @@ def handler(event, context=None):
         "dueDate": event.get("dueDate"),
         "glAccount": gl,
         "glAccountName": coa.name(gl),
+        "glAccountReason": event.get("glAccountReason"),
         "lineItems": event.get("lineItems") or [],
         "confidence": confidence,
         "requiresReceipt": bool(event.get("requiresReceipt", False)),

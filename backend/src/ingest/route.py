@@ -22,8 +22,26 @@ def _bill_confidence(normalized: Mapping[str, Any]) -> float:
 def prepare_bill(
     event: Mapping[str, Any], context: Any = None
 ) -> dict[str, Any]:
+    from shared import coa
+
     upload, normalized = _document_fields(event)
     vendor = event.get("vendorMatch", {}).get("data", {}).get("vendor")
+    extracted_gl = normalized.get("glAccount")
+    vendor_gl = (vendor or {}).get("defaultGlAccount")
+    if coa.is_expense(extracted_gl):
+        gl_account = str(extracted_gl)
+        gl_account_reason = "Suggested from invoice details during document extraction."
+    elif coa.is_expense(vendor_gl):
+        gl_account = str(vendor_gl)
+        gl_account_reason = (
+            f"Matched vendor memory: {vendor.get('name')} uses expense account {gl_account}."
+        )
+    else:
+        gl_account = coa.DEFAULT_EXPENSE
+        gl_account_reason = (
+            f"No valid invoice account or vendor history was available; "
+            f"used default expense account {gl_account}."
+        )
     request: dict[str, Any] = {
         "practiceId": upload["practiceId"],
         "documentId": upload["documentId"],
@@ -34,13 +52,12 @@ def prepare_bill(
         "dueDate": normalized.get("dueDate"),
         "lineItems": normalized.get("lineItems", []),
         "confidence": _bill_confidence(normalized),
+        "glAccount": gl_account,
+        "glAccountReason": gl_account_reason,
     }
     vendor_id = (vendor or {}).get("vendorId")
     if vendor_id:
         request["vendorId"] = vendor_id
-    gl_account = normalized.get("glAccount")
-    if gl_account:
-        request["glAccount"] = gl_account
     return request
 
 
