@@ -51,6 +51,7 @@ export function normalizeBill(bill: ApiBill): Bill {
     glAccount: bill.glAccountName && gl && !gl.includes('·') ? `${gl} · ${bill.glAccountName}` : gl,
     status: bill.status as BillStatus,
     ruleHits: (bill.ruleHits ?? []).map(hit => typeof hit === 'string' ? hit : hit.reason ?? hit.name ?? ''),
+    ...(bill.glAccountReason ? { glAccountReason: bill.glAccountReason } : {}),
     ...(bill.invoiceNumber ? { invoiceNumber: bill.invoiceNumber } : {}),
     ...(bill.requiredApprovers ? { requiredApprovers: bill.requiredApprovers } : {}),
     ...(bill.createdAt ? { createdAt: bill.createdAt } : {}),

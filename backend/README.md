@@ -1,5 +1,46 @@
 # Ledgerline backend: API, workflows, ledger (role C)
 
+## Operations dashboard and nine-vendor demo seed (E5/E7)
+
+`template.yaml` includes an `OperationsDashboard` CloudWatch resource. The normal
+SAM deployment creates it and exports `OperationsDashboardName` and
+`OperationsDashboardUrl`. Its name includes the stack and region because
+CloudWatch dashboards are account-global. It displays the last three hours of
+HTTP API request/error/latency metrics, errors for every stack Lambda, key demo
+Lambda invocation/duration metrics, ingest and approval execution outcomes and
+duration, and DynamoDB read/write throttling. The body uses explicit stack
+resource references and 48 existing service metric series. It does not enable
+detailed API metrics, custom metrics, alarms, log queries, or CloudTrail.
+
+No data can mean no recent traffic; it is not a health check. Approval execution
+duration includes time waiting for a human. After the deployment owner updates
+the stack, open the dashboard output URL and run the coordinated demo to see
+real metrics. CloudTrail remains a separate part of E5; this change does not
+complete that work.
+
+`scripts/seed.py` now defines nine fictional vendors. It preserves the original
+four workflow names and Brightline's initial missing-document state. The
+compliance consultant matches the history seed, with four additional vendors
+covering technology, payroll, office supplies and travel. Repeated runs add
+missing vendors without changing existing vendor IDs, aliases, bank suffixes,
+onboarding flags or bill counts; additional user-created vendors are retained.
+
+For an existing demo practice, the live-account owner can coordinate and run:
+
+```bash
+cd backend
+python scripts/seed.py --table ledgerline-dev --practice p1 --vendors-only
+```
+
+This command writes vendor rows in the selected practice only. It does not
+rewrite META, rules, ledger history, documents or September payout data. A
+normal seed without `--vendors-only` retains its existing META/rule behavior.
+Do not run either against the shared AWS account without team coordination.
+
+Local checks: `python -m unittest discover -s backend/tests -p test_seed_vendors.py`
+and `python -m unittest discover -s backend/tests -p test_operations_dashboard.py`.
+With backend development dependencies installed, also run `cfn-lint backend/template.yaml`.
+
 Serverless on AWS: **API Gateway (HTTP API) + Lambda (Python 3.12) + DynamoDB + Step Functions + S3 Object Lock + EventBridge + Cognito**, all defined in `template.yaml` (AWS SAM).
 
 ## Deploy (from your Mac)
@@ -75,16 +116,16 @@ Controls: no self-approval (uploader ≠ approver), one decision per task token 
 | GET | `/documents` | `?type=&q=` | `[{documentId, type, filename, status, vendorName, amount, billId, locked, createdAt}]` |
 | GET | `/documents/{id}` | | full doc + `viewUrl` (presigned, 15 min) |
 | POST | `/documents/{id}/resolve` | `{resolution: "dismiss" \| "accept", note?}` | closes a `needs_review` document: `dismiss` → `dismissed` (not a financial record; file stays in the library), `accept` → `processed`; records `review` + audit. 409 if not `needs_review`, already resolved, or it has a bill (use `/bills/{id}/confirm`). owner, ops, lpl_bookkeeper |
-| GET | `/vendors` | | `[{vendorId, name, defaultGlAccount, hasW9, hasVoidCheck, bankLast4, billCount}]` |
-| GET | `/bills` | `?status=pending_approval,pending_docs` | bill summaries (newest first) |
-| GET | `/bills/{id}` | | full bill incl. `ruleHits`, `requiredApprovers`, `payment`, `audit[]` |
+| GET | `/vendors` | | `[{vendorId, name, defaultGlAccount, hasW9, hasVoidCheck, bankLast4, billCount, bankDetailReviewRequired, possibleDuplicateVendorNames}]`; a last-four match is only a review candidate, not proof of a shared account |
+| GET | `/bills` | `?status=pending_approval,pending_docs` | bill summaries (newest first), including `glAccountReason` when supplied by ingest |
+| GET | `/bills/{id}` | | full bill incl. `glAccountReason`, `ruleHits`, `requiredApprovers`, `payment`, `audit[]` |
 | POST | `/bills/{id}/decision` | `{decision: "approve"\|"reject", comment}` | `{billId, status: "processing"}`; poll the bill for the final status |
 | POST | `/bills/{id}/confirm` | `{amount?, vendorName?\|vendorId?, glAccount?, dueDate?, invoiceNumber?, invoiceDate?}` | starts workflow |
 | POST | `/bills/{id}/receive` | | marks received, resumes a held bill |
 | GET | `/rules` | | rules (defaults seeded on first call) |
 | POST | `/rules` | `{name, condition, action, approverRole?, priority?, reason?}` | owner only |
 | PATCH | `/rules/{id}` | e.g. `{"enabled": false}` | owner only |
-| POST | `/transactions/import` | raw CSV (`Content-Type: text/csv`): `Date, Description, Amount` (+ optional `Transaction ID`); sample in `scripts/sample_card_transactions.csv` | `{imported, alreadyImported, skipped, categorized, matchedReceipts, transactions[]}`; posts `j-card-<txnId>` (Dr expense / Cr 2100), idempotent; owner, ops, lpl_bookkeeper |
+| POST | `/transactions/import` | raw CSV (`Content-Type: text/csv`): `Date, Description, Amount` (+ optional `Transaction ID`); sample in `scripts/sample_card_transactions.csv` | `{imported, alreadyImported, skipped, categorized, matchedReceipts, transactions[]}` with `categoryReason`; matches receipts on merchant + exact amount + date within 5 days; posts `j-card-<txnId>` (Dr expense / Cr 2100), idempotent; owner, ops, lpl_bookkeeper |
 | GET | `/financials` | `?period=2026-Q3` (or `2026-09`, `2026`) | `{period, pnl:{revenue, expenses, netIncome, monthly[6], categories, revenueLines, expenseLines}, balanceSheet:{assets, liabilities, equity, ...Lines}, cashFlow:{operating, investing, financing, net, ...}, kpis:{margin, recurringPct, revPerClient, expenseRatios, previous}, valuation:{low, mid, high, method, ...}}`; percentages 0–100, matching `frontend/lib/types.ts` (D) |
 | GET | `/revenue/reconciliation` | `?period=2026-09` | `{period, expected, actual, variance, lines:[{id, label, source, ref, expected, actual, variance, status, docId, reason?}], flags:[{id, reason, docId, lineId, status, severity}]}`; `status` = ok/short/over/missing/unexpected (D) |
 | POST | `/ask` | `{question}` | `{answer, citations:[{documentId, label, snippet}], period}` (D) |
@@ -203,7 +244,7 @@ confirmation that workflows have stopped is still required.
 - Log in with Cognito (`UserPoolId`, `UserPoolClientId`); send the **ID token** as `Authorization: Bearer ...`. Role = Cognito group (`owner`, `partner`, `ops`, `lpl_bookkeeper`) for the role switcher.
 - Upload = `POST /documents/upload-url` → `PUT uploadUrl` with `Content-Type` → poll `GET /documents/{id}` until `billId` appears.
 - After `POST /bills/{id}/decision`, the status is `processing` for about a second, then `scheduled`/`rejected`. Poll `GET /bills/{id}`.
-- Show `ruleHits[].reason` as the "why it was routed" chips, and `audit[]` in the side drawer.
+- Show `ruleHits[].reason` as the "why it was routed" chips, `glAccountReason` beside the category, and `audit[]` in the side drawer.
 
 ## Events (bus `ledgerline-<stage>`)
 `VendorUpdated` · `BillAwaitingAction` · `BillRejected` · `LedgerUpdated`

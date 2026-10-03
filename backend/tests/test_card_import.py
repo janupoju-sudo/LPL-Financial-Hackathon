@@ -44,6 +44,9 @@ def test_import_categorizes_and_posts_balanced_journals(aws):
     assert by_desc["DELTA AIR 0062345"]["glAccount"] == "6700"
     assert by_desc["Orion Software license"]["glAccount"] == "6300"
     assert by_desc["Orion Software license"]["categorizedBy"] == "vendor"
+    assert "vendor memory" in by_desc["Orion Software license"]["categoryReason"]
+    assert "keyword" in by_desc["ZOOM.US 888-799-9666"]["categoryReason"]
+    assert "default expense account 6900" in by_desc["CORNER DELI"]["categoryReason"]
     assert by_desc["CORNER DELI"]["glAccount"] == "6900"   # uncategorized -> Other
 
     lines = _card_lines()
@@ -62,7 +65,7 @@ def test_reimport_is_idempotent(aws):
     assert len(_card_lines()) == 8
 
 
-def test_matches_receipt_by_amount_and_date(aws):
+def test_matches_receipt_by_merchant_amount_and_date(aws):
     doc = repo.create_document("p1", "deli.jpg", "image/jpeg", "uploads/p1/d1/deli.jpg", "dev")
     repo.update_document("p1", doc["documentId"], type="receipt", status="processed",
                          extracted={"vendorName": "Corner Deli", "amount": 23.15, "invoiceDate": "2026-09-11"})
@@ -77,6 +80,35 @@ def test_matches_receipt_by_amount_and_date(aws):
     assert deli["receiptDocumentId"] == doc["documentId"]
     assert repo.get_document("p1", doc["documentId"])["cardTxnId"] == deli["txnId"]
     assert any(line["sourceDocId"] == doc["documentId"] for line in _card_lines())
+
+
+def test_does_not_match_receipt_with_wrong_merchant_even_if_amount_and_date_match(aws):
+    doc = repo.create_document("p1", "other.jpg", "image/jpeg", "uploads/p1/d1/other.jpg", "dev")
+    repo.update_document("p1", doc["documentId"], type="receipt", status="processed",
+                         extracted={"vendorName": "Different Merchant", "amount": 23.15,
+                                    "invoiceDate": "2026-09-11"})
+
+    status, body = _import(CSV)
+
+    assert status == 200
+    assert body["matchedReceipts"] == 0
+    deli = next(t for t in body["transactions"] if t["description"] == "CORNER DELI")
+    assert deli["receiptDocumentId"] is None
+    assert repo.get_document("p1", doc["documentId"]).get("cardTxnId") is None
+
+
+def test_receipt_with_ambiguous_equal_date_candidates_is_not_matched(aws):
+    for index, day in enumerate(("2026-09-11", "2026-09-13"), start=1):
+        doc = repo.create_document("p1", f"deli-{index}.jpg", "image/jpeg",
+                                   f"uploads/p1/d{index}/deli.jpg", "dev")
+        repo.update_document("p1", doc["documentId"], type="receipt", status="processed",
+                             extracted={"vendorName": "Corner Deli", "amount": 23.15,
+                                        "invoiceDate": day})
+
+    status, body = _import(CSV)
+
+    assert status == 200
+    assert body["matchedReceipts"] == 0
 
 
 def test_accepts_base64_body_and_alternate_headers(aws):
@@ -105,4 +137,5 @@ def test_list_transactions_reads_imported_charges(aws):
     assert len(txns) == 4  # the payment row is skipped on import
     zoom = next(t for t in txns if t["description"].startswith("ZOOM"))
     assert (zoom["amount"], zoom["glAccount"], zoom["glAccountName"]) == (149.9, "6300", "Technology")
+    assert "keyword" in zoom["categoryReason"]
     assert zoom["journalId"].startswith("j-card-")

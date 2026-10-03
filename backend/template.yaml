@@ -575,7 +575,601 @@ Resources:
         - LambdaInvokePolicy: { FunctionName: !Ref MarkRejectedFunction }
         - EventBridgePutEventsPolicy: { EventBusName: !Ref AppEventBus }
 
+  # ---------------------------------------------------------------- E5: observability
+  OperationsDashboard:
+    Type: AWS::CloudWatch::Dashboard
+    Properties:
+      # Dashboards are account-global: include region to avoid multi-region collisions.
+      DashboardName: !Sub ${AWS::StackName}-${AWS::Region}-operations
+      DashboardBody: !Sub |
+        {
+          "start": "-PT3H",
+          "periodOverride": "inherit",
+          "widgets": [
+            {
+              "type": "text",
+              "x": 0,
+              "y": 0,
+              "width": 24,
+              "height": 3,
+              "properties": {
+                "markdown": "# Ledgerline operations — ${Stage}\nStack: **${AWS::StackName}** · Region: **${AWS::Region}**\nExisting service metrics only. No data can mean no traffic; it does not prove health. Approval wait time is included in workflow duration."
+              }
+            },
+            {
+              "type": "metric",
+              "x": 0,
+              "y": 3,
+              "width": 8,
+              "height": 6,
+              "properties": {
+                "title": "HTTP API requests",
+                "metrics": [
+                  [
+                    "AWS/ApiGateway",
+                    "Count",
+                    "ApiId",
+                    "${HttpApi}"
+                  ]
+                ],
+                "view": "timeSeries",
+                "region": "${AWS::Region}",
+                "period": 60,
+                "stat": "Sum",
+                "stacked": false
+              }
+            },
+            {
+              "type": "metric",
+              "x": 8,
+              "y": 3,
+              "width": 8,
+              "height": 6,
+              "properties": {
+                "title": "HTTP API client/server errors",
+                "metrics": [
+                  [
+                    "AWS/ApiGateway",
+                    "4xx",
+                    "ApiId",
+                    "${HttpApi}"
+                  ],
+                  [
+                    "AWS/ApiGateway",
+                    "5xx",
+                    "ApiId",
+                    "${HttpApi}"
+                  ]
+                ],
+                "view": "timeSeries",
+                "region": "${AWS::Region}",
+                "period": 60,
+                "stat": "Sum",
+                "stacked": false
+              }
+            },
+            {
+              "type": "metric",
+              "x": 16,
+              "y": 3,
+              "width": 8,
+              "height": 6,
+              "properties": {
+                "title": "HTTP API latency (p95)",
+                "metrics": [
+                  [
+                    "AWS/ApiGateway",
+                    "Latency",
+                    "ApiId",
+                    "${HttpApi}"
+                  ],
+                  [
+                    "AWS/ApiGateway",
+                    "IntegrationLatency",
+                    "ApiId",
+                    "${HttpApi}"
+                  ]
+                ],
+                "view": "timeSeries",
+                "region": "${AWS::Region}",
+                "period": 60,
+                "stat": "p95",
+                "stacked": false
+              }
+            },
+            {
+              "type": "metric",
+              "x": 0,
+              "y": 9,
+              "width": 24,
+              "height": 6,
+              "properties": {
+                "title": "Lambda errors — all stack functions",
+                "metrics": [
+                  [
+                    "AWS/Lambda",
+                    "Errors",
+                    "FunctionName",
+                    "${DocumentsFunction}",
+                    {
+                      "label": "Documents"
+                    }
+                  ],
+                  [
+                    "AWS/Lambda",
+                    "Errors",
+                    "FunctionName",
+                    "${VendorsFunction}",
+                    {
+                      "label": "Vendors"
+                    }
+                  ],
+                  [
+                    "AWS/Lambda",
+                    "Errors",
+                    "FunctionName",
+                    "${BillsFunction}",
+                    {
+                      "label": "Bills"
+                    }
+                  ],
+                  [
+                    "AWS/Lambda",
+                    "Errors",
+                    "FunctionName",
+                    "${RulesFunction}",
+                    {
+                      "label": "Rules"
+                    }
+                  ],
+                  [
+                    "AWS/Lambda",
+                    "Errors",
+                    "FunctionName",
+                    "${TransactionsFunction}",
+                    {
+                      "label": "Transactions"
+                    }
+                  ],
+                  [
+                    "AWS/Lambda",
+                    "Errors",
+                    "FunctionName",
+                    "${FinancialsFunction}",
+                    {
+                      "label": "Financials"
+                    }
+                  ],
+                  [
+                    "AWS/Lambda",
+                    "Errors",
+                    "FunctionName",
+                    "${AskFunction}",
+                    {
+                      "label": "Ask"
+                    }
+                  ],
+                  [
+                    "AWS/Lambda",
+                    "Errors",
+                    "FunctionName",
+                    "${ExportFunction}",
+                    {
+                      "label": "Export"
+                    }
+                  ],
+                  [
+                    "AWS/Lambda",
+                    "Errors",
+                    "FunctionName",
+                    "${CreateBillFunction}",
+                    {
+                      "label": "CreateBill"
+                    }
+                  ],
+                  [
+                    "AWS/Lambda",
+                    "Errors",
+                    "FunctionName",
+                    "${EvaluateRulesFunction}",
+                    {
+                      "label": "EvaluateRules"
+                    }
+                  ],
+                  [
+                    "AWS/Lambda",
+                    "Errors",
+                    "FunctionName",
+                    "${StoreTaskTokenFunction}",
+                    {
+                      "label": "StoreTaskToken"
+                    }
+                  ],
+                  [
+                    "AWS/Lambda",
+                    "Errors",
+                    "FunctionName",
+                    "${PostLedgerFunction}",
+                    {
+                      "label": "PostLedger"
+                    }
+                  ],
+                  [
+                    "AWS/Lambda",
+                    "Errors",
+                    "FunctionName",
+                    "${SchedulePaymentFunction}",
+                    {
+                      "label": "SchedulePayment"
+                    }
+                  ],
+                  [
+                    "AWS/Lambda",
+                    "Errors",
+                    "FunctionName",
+                    "${MarkRejectedFunction}",
+                    {
+                      "label": "MarkRejected"
+                    }
+                  ],
+                  [
+                    "AWS/Lambda",
+                    "Errors",
+                    "FunctionName",
+                    "${ResumeHeldBillsFunction}",
+                    {
+                      "label": "ResumeHeldBills"
+                    }
+                  ],
+                  [
+                    "AWS/Lambda",
+                    "Errors",
+                    "FunctionName",
+                    "${LockDocumentFunction}",
+                    {
+                      "label": "LockDocument"
+                    }
+                  ],
+                  [
+                    "AWS/Lambda",
+                    "Errors",
+                    "FunctionName",
+                    "${ClassifyFunction}",
+                    {
+                      "label": "Classify"
+                    }
+                  ],
+                  [
+                    "AWS/Lambda",
+                    "Errors",
+                    "FunctionName",
+                    "${ExtractFunction}",
+                    {
+                      "label": "Extract"
+                    }
+                  ],
+                  [
+                    "AWS/Lambda",
+                    "Errors",
+                    "FunctionName",
+                    "${NormalizeFunction}",
+                    {
+                      "label": "Normalize"
+                    }
+                  ],
+                  [
+                    "AWS/Lambda",
+                    "Errors",
+                    "FunctionName",
+                    "${MatchVendorFunction}",
+                    {
+                      "label": "MatchVendor"
+                    }
+                  ],
+                  [
+                    "AWS/Lambda",
+                    "Errors",
+                    "FunctionName",
+                    "${PrepareBillFunction}",
+                    {
+                      "label": "PrepareBill"
+                    }
+                  ],
+                  [
+                    "AWS/Lambda",
+                    "Errors",
+                    "FunctionName",
+                    "${FinalizeIngestFunction}",
+                    {
+                      "label": "FinalizeIngest"
+                    }
+                  ],
+                  [
+                    "AWS/Lambda",
+                    "Errors",
+                    "FunctionName",
+                    "${IngestFailureFunction}",
+                    {
+                      "label": "IngestFailure"
+                    }
+                  ]
+                ],
+                "view": "timeSeries",
+                "region": "${AWS::Region}",
+                "period": 60,
+                "stat": "Sum",
+                "stacked": false
+              }
+            },
+            {
+              "type": "metric",
+              "x": 0,
+              "y": 15,
+              "width": 12,
+              "height": 6,
+              "properties": {
+                "title": "Key demo Lambda invocations",
+                "metrics": [
+                  [
+                    "AWS/Lambda",
+                    "Invocations",
+                    "FunctionName",
+                    "${ExtractFunction}",
+                    {
+                      "label": "Extract"
+                    }
+                  ],
+                  [
+                    "AWS/Lambda",
+                    "Invocations",
+                    "FunctionName",
+                    "${FinalizeIngestFunction}",
+                    {
+                      "label": "FinalizeIngest"
+                    }
+                  ],
+                  [
+                    "AWS/Lambda",
+                    "Invocations",
+                    "FunctionName",
+                    "${PostLedgerFunction}",
+                    {
+                      "label": "PostLedger"
+                    }
+                  ],
+                  [
+                    "AWS/Lambda",
+                    "Invocations",
+                    "FunctionName",
+                    "${AskFunction}",
+                    {
+                      "label": "Ask"
+                    }
+                  ]
+                ],
+                "view": "timeSeries",
+                "region": "${AWS::Region}",
+                "period": 60,
+                "stat": "Sum",
+                "stacked": false
+              }
+            },
+            {
+              "type": "metric",
+              "x": 12,
+              "y": 15,
+              "width": 12,
+              "height": 6,
+              "properties": {
+                "title": "Key demo Lambda duration (p95)",
+                "metrics": [
+                  [
+                    "AWS/Lambda",
+                    "Duration",
+                    "FunctionName",
+                    "${ExtractFunction}",
+                    {
+                      "label": "Extract"
+                    }
+                  ],
+                  [
+                    "AWS/Lambda",
+                    "Duration",
+                    "FunctionName",
+                    "${FinalizeIngestFunction}",
+                    {
+                      "label": "FinalizeIngest"
+                    }
+                  ],
+                  [
+                    "AWS/Lambda",
+                    "Duration",
+                    "FunctionName",
+                    "${PostLedgerFunction}",
+                    {
+                      "label": "PostLedger"
+                    }
+                  ],
+                  [
+                    "AWS/Lambda",
+                    "Duration",
+                    "FunctionName",
+                    "${AskFunction}",
+                    {
+                      "label": "Ask"
+                    }
+                  ]
+                ],
+                "view": "timeSeries",
+                "region": "${AWS::Region}",
+                "period": 60,
+                "stat": "p95",
+                "stacked": false
+              }
+            },
+            {
+              "type": "metric",
+              "x": 0,
+              "y": 21,
+              "width": 12,
+              "height": 6,
+              "properties": {
+                "title": "Ingest / approval execution outcomes",
+                "metrics": [
+                  [
+                    "AWS/States",
+                    "ExecutionsStarted",
+                    "StateMachineArn",
+                    "${IngestDocumentStateMachine}",
+                    {
+                      "label": "Ingest Started"
+                    }
+                  ],
+                  [
+                    "AWS/States",
+                    "ExecutionsSucceeded",
+                    "StateMachineArn",
+                    "${IngestDocumentStateMachine}",
+                    {
+                      "label": "Ingest Succeeded"
+                    }
+                  ],
+                  [
+                    "AWS/States",
+                    "ExecutionsFailed",
+                    "StateMachineArn",
+                    "${IngestDocumentStateMachine}",
+                    {
+                      "label": "Ingest Failed"
+                    }
+                  ],
+                  [
+                    "AWS/States",
+                    "ExecutionsTimedOut",
+                    "StateMachineArn",
+                    "${IngestDocumentStateMachine}",
+                    {
+                      "label": "Ingest TimedOut"
+                    }
+                  ],
+                  [
+                    "AWS/States",
+                    "ExecutionsStarted",
+                    "StateMachineArn",
+                    "${ApproveBillStateMachine}",
+                    {
+                      "label": "Approval Started"
+                    }
+                  ],
+                  [
+                    "AWS/States",
+                    "ExecutionsSucceeded",
+                    "StateMachineArn",
+                    "${ApproveBillStateMachine}",
+                    {
+                      "label": "Approval Succeeded"
+                    }
+                  ],
+                  [
+                    "AWS/States",
+                    "ExecutionsFailed",
+                    "StateMachineArn",
+                    "${ApproveBillStateMachine}",
+                    {
+                      "label": "Approval Failed"
+                    }
+                  ],
+                  [
+                    "AWS/States",
+                    "ExecutionsTimedOut",
+                    "StateMachineArn",
+                    "${ApproveBillStateMachine}",
+                    {
+                      "label": "Approval TimedOut"
+                    }
+                  ]
+                ],
+                "view": "timeSeries",
+                "region": "${AWS::Region}",
+                "period": 60,
+                "stat": "Sum",
+                "stacked": false
+              }
+            },
+            {
+              "type": "metric",
+              "x": 12,
+              "y": 21,
+              "width": 12,
+              "height": 6,
+              "properties": {
+                "title": "Ingest / approval duration",
+                "metrics": [
+                  [
+                    "AWS/States",
+                    "ExecutionTime",
+                    "StateMachineArn",
+                    "${IngestDocumentStateMachine}",
+                    {
+                      "label": "Ingest"
+                    }
+                  ],
+                  [
+                    "AWS/States",
+                    "ExecutionTime",
+                    "StateMachineArn",
+                    "${ApproveBillStateMachine}",
+                    {
+                      "label": "Approval"
+                    }
+                  ]
+                ],
+                "view": "timeSeries",
+                "region": "${AWS::Region}",
+                "period": 60,
+                "stat": "Average",
+                "stacked": false
+              }
+            },
+            {
+              "type": "metric",
+              "x": 0,
+              "y": 27,
+              "width": 24,
+              "height": 6,
+              "properties": {
+                "title": "DynamoDB read/write throttling",
+                "metrics": [
+                  [
+                    "AWS/DynamoDB",
+                    "ReadThrottleEvents",
+                    "TableName",
+                    "${LedgerTable}"
+                  ],
+                  [
+                    "AWS/DynamoDB",
+                    "WriteThrottleEvents",
+                    "TableName",
+                    "${LedgerTable}"
+                  ]
+                ],
+                "view": "timeSeries",
+                "region": "${AWS::Region}",
+                "period": 60,
+                "stat": "Sum",
+                "stacked": false
+              }
+            }
+          ]
+        }
+
 Outputs:
+  OperationsDashboardName:
+    Description: CloudWatch operations dashboard created by this stack
+    Value: !Ref OperationsDashboard
+  OperationsDashboardUrl:
+    Description: Open the dashboard after the deployment owner updates the stack
+    Value: !Sub https://console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=${OperationsDashboard}
   ApiUrl:
     Description: Base URL for the frontend (NEXT_PUBLIC_API_URL)
     Value: !Sub https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com

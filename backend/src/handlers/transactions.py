@@ -11,9 +11,10 @@ are skipped.
 Per charge: category from vendor memory (vendor name or alias inside the description), else merchant
 keywords, else 6900 Other. Posts journal j-card-<txnId> (Dr expense / Cr 2100), idempotent, so
 re-importing the same file books nothing twice. Matches a processed receipt document with the same
-amount dated within 5 days and links it both ways.
+merchant, amount and date within 5 days and links it both ways.
 
-Response: {imported, alreadyImported, skipped, categorized, matchedReceipts, transactions[]}
+Response: {imported, alreadyImported, skipped, categorized, matchedReceipts, transactions[]};
+each transaction includes a categoryReason and any receipt link.
 """
 import base64
 import csv
@@ -119,7 +120,7 @@ def parse_csv(text: str) -> list:
 
 
 def categorize(description: str, vendors: list):
-    """Returns (glAccount, categorizedBy, vendorId)."""
+    """Return (GL account, categorization source, vendor ID, explanation)."""
     text = repo.normalize_name(description)
     padded = f" {text} "
     for v in vendors:
@@ -127,12 +128,39 @@ def categorize(description: str, vendors: list):
         if any(n and f" {n} " in padded for n in names):
             gl = v.get("defaultGlAccount")
             if coa.is_expense(gl):
-                return gl, "vendor", v.get("vendorId")
+                return (
+                    gl,
+                    "vendor",
+                    v.get("vendorId"),
+                    f"Matched vendor memory: {v.get('name')} uses expense account {gl}.",
+                )
     lowered = description.lower()
     for words, account in KEYWORDS:
         if any(re.search(rf"\b{re.escape(w)}\b", lowered) for w in words):
-            return account, "keyword", None
-    return coa.DEFAULT_EXPENSE, None, None
+            return (
+                account,
+                "keyword",
+                None,
+                f"Matched merchant keyword for expense account {account}.",
+            )
+    return (
+        coa.DEFAULT_EXPENSE,
+        None,
+        None,
+        f"No vendor or merchant keyword matched; assigned default expense account {coa.DEFAULT_EXPENSE}.",
+    )
+
+
+def _merchant_matches(description: str, merchant: str | None) -> bool:
+    if not merchant:
+        return False
+    normalized_description = repo.normalize_name(description)
+    normalized_merchant = repo.normalize_name(merchant)
+    return bool(
+        normalized_description
+        and normalized_merchant
+        and f" {normalized_merchant} " in f" {normalized_description} "
+    )
 
 
 def _receipt_candidates(practice_id) -> list:
@@ -149,6 +177,9 @@ def _match_receipt(txn: dict, receipts: list):
     best, best_gap = None, None
     for doc in receipts:
         extracted = doc["extracted"]
+        merchant = extracted.get("vendorName") or extracted.get("merchant")
+        if not _merchant_matches(txn["description"], merchant):
+            continue
         if abs(float(extracted["amount"]) - txn["amount"]) >= 0.005:
             continue
         receipt_date = extracted.get("invoiceDate") or extracted.get("date")
@@ -157,6 +188,8 @@ def _match_receipt(txn: dict, receipts: list):
         gap = abs((date.fromisoformat(receipt_date) - date.fromisoformat(txn["date"])).days)
         if gap <= RECEIPT_WINDOW_DAYS and (best_gap is None or gap < best_gap):
             best, best_gap = doc, gap
+        elif gap <= RECEIPT_WINDOW_DAYS and gap == best_gap:
+            best = None
     return best
 
 
@@ -180,11 +213,12 @@ def import_transactions(event):
             result["alreadyImported"] += 1
             continue
 
-        gl, how, vendor_id = categorize(txn["description"], vendors)
+        gl, how, vendor_id, category_reason = categorize(txn["description"], vendors)
         receipt = _match_receipt(txn, receipts)
         receipt_id = receipt["documentId"] if receipt else None
         ledger.post_journal(p, journal_id, txn["date"], ledger.card_spend_lines(txn["amount"], gl),
-                            memo=f"Card: {txn['description']}", source_doc_id=receipt_id,
+                            memo=f"Card: {txn['description']}\nCategory reason: {category_reason}",
+                            source_doc_id=receipt_id,
                             source_type="card", source_id=txn["txnId"])
         if receipt:
             receipts.remove(receipt)
@@ -195,7 +229,8 @@ def import_transactions(event):
         result["categorized"] += 1 if how else 0
         result["transactions"].append({
             **txn, "glAccount": gl, "glAccountName": coa.name(gl), "categorizedBy": how,
-            "vendorId": vendor_id, "receiptDocumentId": receipt_id, "journalId": journal_id,
+            "categoryReason": category_reason, "vendorId": vendor_id,
+            "receiptDocumentId": receipt_id, "journalId": journal_id,
         })
     return 200, result
 
@@ -210,13 +245,15 @@ def list_transactions(event):
         if line.get("sourceType") != "card" or not line.get("debit"):
             continue
         memo = line.get("memo") or ""
+        description, _, category_reason = memo.partition("\nCategory reason: ")
         txns.append({
             "txnId": line.get("sourceId"),
             "date": line["date"],
-            "description": memo[len("Card: "):] if memo.startswith("Card: ") else memo,
+            "description": description[len("Card: "):] if description.startswith("Card: ") else description,
             "amount": line["debit"] / 100,
             "glAccount": line["account"],
             "glAccountName": coa.name(line["account"]),
+            "categoryReason": category_reason or None,
             "receiptDocumentId": line.get("sourceDocId"),
             "journalId": line.get("journalId"),
         })
