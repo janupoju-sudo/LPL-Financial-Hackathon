@@ -36,10 +36,14 @@ def test_vendor_memory_and_auto_approve(aws):
     v, doc = setup_known_vendor()
     out = create_bill.handler({"documentId": doc["documentId"], "vendorName": "ORION SOFTWARE, LLC",
                                "amount": 450, "invoiceNumber": "INV-1", "invoiceDate": "2026-09-05",
-                               "confidence": 0.95})
+                               "confidence": 0.95,
+                               "glAccountReason": "Matched vendor memory: Orion Software LLC uses expense account 6300."})
     assert out["status"] == "processing" and aws.started[-1]["billId"] == out["billId"]
     bill = repo.get_bill("p1", out["billId"])
     assert bill["vendorId"] == v["vendorId"] and bill["glAccount"] == "6300"   # remembered vendor + GL
+    assert "vendor memory" in bill["glAccountReason"]
+    detail = bills_api.handler(api_event("GET /bills/{id}", {"id": out["billId"]}))
+    assert "vendor memory" in body_of(detail)["glAccountReason"]
 
     run_until_wait("p1", out["billId"])
     bill = repo.get_bill("p1", out["billId"])

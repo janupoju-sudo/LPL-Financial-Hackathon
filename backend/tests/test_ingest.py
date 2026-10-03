@@ -237,8 +237,35 @@ class IngestValidationTests(unittest.TestCase):
         self.assertEqual(payload["vendorName"], "Orion Software LLC")
         self.assertEqual(payload["amount"], 1850.0)
         self.assertEqual(payload["glAccount"], "6300")
+        self.assertIn("invoice details", payload["glAccountReason"])
         self.assertEqual(payload["confidence"], 0.55)
 
+    def test_prepare_bill_explains_extracted_and_fallback_gl_accounts(self) -> None:
+        event = {
+            "classification": {"data": {"bucket": "docs", "key": "uploads/p1/d1/invoice.pdf",
+                                        "practiceId": "p1", "documentId": "d1",
+                                        "filename": "invoice.pdf", "documentType": "invoice"}},
+            "normalization": {"data": {"normalized": {"type": "invoice", "confidence": 0.9,
+                                                        "vendorConfidence": 0.9, "vendorName": "Unknown",
+                                                        "amount": 10, "glAccount": "6500"}}},
+            "vendorMatch": {"data": {"vendor": None}},
+        }
+        extracted = prepare_bill(event)
+        self.assertEqual(extracted["glAccount"], "6500")
+        self.assertIn("invoice details", extracted["glAccountReason"])
+
+        event["normalization"]["data"]["normalized"]["glAccount"] = None
+        event["vendorMatch"]["data"]["vendor"] = {
+            "vendorId": "ven-1", "name": "Known Vendor", "defaultGlAccount": "6300"
+        }
+        vendor_default = prepare_bill(event)
+        self.assertEqual(vendor_default["glAccount"], "6300")
+        self.assertIn("vendor memory", vendor_default["glAccountReason"])
+
+        event["vendorMatch"]["data"]["vendor"] = None
+        fallback = prepare_bill(event)
+        self.assertEqual(fallback["glAccount"], "6900")
+        self.assertIn("default expense account", fallback["glAccountReason"])
     def test_payout_is_saved_for_reconciliation_and_posted_to_ledger(self) -> None:
         repo = Mock()
         ledger = Mock()
