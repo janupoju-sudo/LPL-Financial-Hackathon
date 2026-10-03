@@ -668,11 +668,14 @@ td.nowrap { white-space: nowrap; }
 .ob-note svg { flex-shrink: 0; margin-top: 2px; }
 .ob-slider-head { display: flex; justify-content: space-between; align-items: baseline; }
 .ob-slider-head strong { font-size: 22px; letter-spacing: -0.02em; }
-.ob-range { -webkit-appearance: none; appearance: none; width: 100%; height: 6px; border-radius: 6px; background: linear-gradient(90deg, var(--ink) var(--fill), var(--line-strong) var(--fill)); outline: none; margin: 8px 0 2px; }
+.ob-range { -webkit-appearance: none; appearance: none; width: 100%; height: 6px; padding: 0; border: 0; box-shadow: none !important; border-radius: 6px; background: linear-gradient(90deg, var(--ink) var(--fill), var(--line-strong) var(--fill)); outline: none; margin: 8px 0 2px; }
 .ob-range::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; border-radius: 50%; background: var(--surface); border: 2px solid var(--ink); box-shadow: var(--shadow); cursor: grab; transition: transform .15s; }
 .ob-range::-webkit-slider-thumb:active { transform: scale(1.15); cursor: grabbing; }
 .ob-range::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; background: var(--surface); border: 2px solid var(--ink); cursor: grab; }
-.ob-range-ends { display: flex; justify-content: space-between; color: var(--faint); font-size: 11.5px; font-family: var(--mono); }
+.ob-range-ends { position: relative; height: 16px; color: var(--faint); font-size: 11.5px; font-family: var(--mono); }
+.ob-range-ends span { position: absolute; transform: translateX(-50%); }
+.ob-range-ends span:first-child { transform: none; }
+.ob-range-ends span:last-child { transform: translateX(-100%); }
 .ob-stepper { display: inline-grid; grid-template-columns: 44px 90px 44px; border: 1px solid var(--line-strong); border-radius: var(--r-md); overflow: hidden; width: max-content; background: var(--surface); }
 .ob-stepper button { border: 0; background: none; color: var(--ink); font-size: 18px; cursor: pointer; }
 .ob-stepper button:hover { background: var(--hover); }

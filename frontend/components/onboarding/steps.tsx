@@ -27,17 +27,26 @@ export function PracticeStep({ answers, update }: StepProps) {
   );
 }
 
-const fmtAum = (m: number) => m >= 1000 ? `$${(m / 1000).toFixed(m % 1000 ? 2 : 1)}B` : `$${m}M`;
+const fmtAum = (m: number) => m >= 1000 ? `$${+(m / 1000).toFixed(2)}B` : `$${m}M`;
+// AUM runs $1M–$2B, so the slider is logarithmic: each stretch of track covers 10x the one before,
+// which keeps small practices as easy to pick as large ones. Values snap to round numbers.
+const AUM_MIN = 1, AUM_MAX = 2000, SLIDER_STEPS = 1000;
+const aumToPos = (m: number) => Math.round(Math.log(Math.min(Math.max(m, AUM_MIN), AUM_MAX) / AUM_MIN) / Math.log(AUM_MAX / AUM_MIN) * SLIDER_STEPS);
+const posToAum = (pos: number) => {
+  const raw = AUM_MIN * (AUM_MAX / AUM_MIN) ** (pos / SLIDER_STEPS);
+  const snap = raw < 20 ? 1 : raw < 100 ? 5 : raw < 500 ? 10 : raw < 1000 ? 25 : 50;
+  return Math.min(AUM_MAX, Math.max(AUM_MIN, Math.round(raw / snap) * snap));
+};
 
 export function BusinessStep({ answers, update }: StepProps) {
   const toggle = (key: Answers['revenue'][number]) => update({ revenue: answers.revenue.includes(key) ? answers.revenue.filter(r => r !== key) : [...answers.revenue, key] });
-  const pct = ((answers.aum - 25) / (2000 - 25)) * 100;
+  const pos = aumToPos(answers.aum);
   return (
     <motion.div className="ob-fields" variants={stagger(0.06)} initial="hidden" animate="show">
       <Item variants={fadeUp} className="ob-field">
         <div className="ob-slider-head"><span>Assets under management</span><motion.strong key={answers.aum} initial={{ y: -6, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="mono">{fmtAum(answers.aum)}</motion.strong></div>
-        <input type="range" className="ob-range" min={25} max={2000} step={25} value={answers.aum} style={{ '--fill': `${pct}%` } as React.CSSProperties} onChange={e => update({ aum: Number(e.target.value) })} aria-label="Assets under management in millions" />
-        <div className="ob-range-ends"><span>$25M</span><span>$2B</span></div>
+        <input type="range" className="ob-range" min={0} max={SLIDER_STEPS} step={1} value={pos} style={{ '--fill': `${pos / SLIDER_STEPS * 100}%` } as React.CSSProperties} onChange={e => update({ aum: posToAum(Number(e.target.value)) })} aria-label="Assets under management" aria-valuetext={fmtAum(answers.aum)} />
+        <div className="ob-range-ends" aria-hidden>{[1, 10, 100, 1000, 2000].map(m => <span key={m} style={{ left: `${aumToPos(m) / SLIDER_STEPS * 100}%` }}>{fmtAum(m)}</span>)}</div>
       </Item>
       <Field label="Number of client households">
         <div className="ob-stepper">
@@ -149,7 +158,7 @@ export function DocumentsStep({ answers, update }: StepProps) {
       </motion.ul>
       <Item variants={fadeUp}>
         <button type="button" role="switch" aria-checked={answers.payoutsConnected} className={`ob-rule ${answers.payoutsConnected ? 'on' : ''}`} onClick={() => update({ payoutsConnected: !answers.payoutsConnected })}>
-          <div><strong><Link2 size={15} /> Connect LPL payout statements</strong><small>Monthly payouts arrive on their own and are matched to your fee schedule.</small></div>
+          <div><strong><Link2 size={15} /> Connect payout statements</strong><small>Monthly payouts arrive on their own and are matched to your fee schedule.</small></div>
           <span className="ob-switch"><motion.span layout transition={spring} /></span>
         </button>
       </Item>
