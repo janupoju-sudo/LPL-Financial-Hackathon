@@ -76,3 +76,15 @@ class Breakdown(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class AskCitations(unittest.TestCase):
+    def test_documents_behind_a_sub_account_back_their_category_driver(self):
+        e = sample_entries() + [
+            {"journalId": "cons", "date": "2026-09-05", "account": "6630", "debit": 255_000, "credit": 0,
+             "sourceDocId": "doc_consultant"},
+            {"journalId": "cons", "date": "2026-09-05", "account": "2000", "debit": 0, "credit": 255_000,
+             "sourceDocId": "doc_consultant"}]
+        docs = [{"documentId": "doc_consultant", "filename": "consultant_invoice.pdf", "type": "invoice"}]
+        picked = context.pick_documents("Why did my margin drop?", docs, e, "2026-Q3", ["6600"])
+        self.assertEqual([context.doc_id(d) for d in picked], ["doc_consultant"])
