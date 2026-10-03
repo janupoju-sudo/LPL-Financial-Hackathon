@@ -17,3 +17,5 @@ samconfig.toml
 .env
 .env.*
 backend/.dev-exports/
+!.env.example
+!.env.live.example

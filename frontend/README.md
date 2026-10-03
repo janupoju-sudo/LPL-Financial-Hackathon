@@ -1,5 +1,7 @@
 # Ledgerline frontend
 
+Google Drive imports are available beside the document upload button. See [Google Drive setup and testing](../docs/GOOGLE-DRIVE-IMPORT.md) for credentials, Cloud Console configuration, production settings, supported formats and manual tests.
+
 ```powershell
 cd frontend
 npm.cmd ci

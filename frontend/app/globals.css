@@ -551,3 +551,5 @@ td.nowrap { white-space: nowrap; }
 .documents-summary button[aria-pressed="true"] strong { color: inherit; }
 .document-results { scroll-margin-top: 100px; }
 .document-results:focus { outline: 2px solid var(--primary); outline-offset: 6px; border-radius: 7px; }
+.drive-import { margin-top: 12px; }
+.dropzone .drive-import p { max-width: 640px; margin: 12px auto 0; overflow-wrap: anywhere; }

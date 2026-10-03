@@ -9,6 +9,7 @@ import type { Answer, Bill, BillApprovalChanges, BillDetail, BillReview, CardTra
 import { normalizeBill, normalizeBillDetail, normalizeDocument, normalizeFinancials, normalizeReconciliation, normalizeRule, normalizeVendor, toApiRule, type ApiBill, type ApiDocument, type ApiRule, type ApiVendor, type LegacyFinancials } from './contracts';
 import { localDocuments } from './local-documents';
 import { validateLocalApi } from './local-mode';
+import { validateDocumentFile } from './upload-file';
 
 export const USE_MOCKS = process.env.NEXT_PUBLIC_USE_MOCKS !== 'false';
 export const USE_LOCAL_API = process.env.NEXT_PUBLIC_LOCAL_API === 'true';
@@ -70,8 +71,7 @@ export const api = {
   async createRule(input: Omit<Rule, 'id'>) { if (USE_LOCAL_API) throw new Error('D’s local server does not support rules.'); if (!USE_MOCKS) { await request<ApiRule>('/rules', toApiRule(input)); changed(); return api.rules(); } rules.push({ ...input, id: crypto.randomUUID() }); changed(); return clone(rules); },
   async upload(file: File, onProgress: (status: string) => void, signal?: AbortSignal): Promise<Document> {
     if (USE_LOCAL_API) throw new Error('D’s local server does not support uploads.');
-    if (file.size > 20 * 1024 * 1024) throw new Error('Files must be smaller than 20 MB.');
-    if (!['application/pdf', 'image/png', 'image/jpeg'].includes(file.type)) throw new Error('Choose a PDF, PNG, or JPG document.');
+    validateDocumentFile(file);
     onProgress('Uploading');
     if (!USE_MOCKS) {
       const { documentId, uploadUrl } = await request<{ documentId: string; uploadUrl: string }>('/documents/upload-url', { filename: file.name, contentType: file.type });
