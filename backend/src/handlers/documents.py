@@ -4,7 +4,7 @@ POST /documents/upload-url   -> presigned S3 PUT; upload lands at uploads/<pract
 GET  /documents?type=&q=     -> library list
 GET  /documents/{id}         -> detail + presigned view URL
 POST /documents/{id}/resolve -> close out a needs_review document: {resolution: dismiss|accept, note?}
-                                (owner, ops, lpl_bookkeeper; a document with a bill is resolved via /bills/{id}/confirm)
+                                (owner, ops; a document with a bill is resolved via /bills/{id}/confirm)
 """
 import os
 import re
@@ -47,6 +47,7 @@ def safe_filename(name: str) -> str:
 
 def upload_url(event):
     caller = get_caller(event)
+    require_role(caller, "owner", "ops")
     body = parse_body(event)
     content_type = body.get("contentType", "application/pdf")
     if content_type not in ALLOWED_TYPES:
@@ -97,7 +98,7 @@ def resolve_doc(event):
     """dismiss = not a financial record (kept in the library, nothing posted);
     accept = the extracted fields are correct as shown."""
     caller = get_caller(event)
-    require_role(caller, "owner", "ops", "lpl_bookkeeper")
+    require_role(caller, "owner", "ops")
     doc_id = path_param(event, "id")
     body = parse_body(event)
     resolution = body.get("resolution")

@@ -1,6 +1,6 @@
 """Card transactions API (C11).
 
-POST /transactions/import   raw CSV body (Content-Type: text/csv)            (owner, ops, lpl_bookkeeper)
+POST /transactions/import   raw CSV body (Content-Type: text/csv)            (owner, ops)
 GET  /transactions          imported card charges, newest first (read from the j-card-* journals)
 
 CSV: a header row with a date column (Date | Transaction Date | Posted Date), a description column
@@ -202,7 +202,7 @@ def _match_receipt(txn: dict, receipts: list):
 
 def import_transactions(event):
     caller = get_caller(event)
-    require_role(caller, "owner", "ops", "lpl_bookkeeper")
+    require_role(caller, "owner", "ops")
     p = caller.practice_id
     rows = parse_csv(_raw_body(event))
 
