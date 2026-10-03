@@ -39,6 +39,11 @@ Dependencies are noted as `← B3` (wait on, or mock, that task).
 - [x] A14. Card transactions page (CSV import) ← C9
 - [x] A15. Profile settings panel with persistent dark mode toggle
 - [x] A16. Align Brightline demo vendor and switch frontend to deployed stack outputs
+- [x] A17. Combine Inbox and Library into Documents: Upload action, All documents / Needs review / Processing / Vendors views, summary counts, search and filters; counts filter and scroll to results
+- [x] A18. Remove header mode badge, role control, bell shortcut, and sidebar connection/authentication text
+
+**A validation:** Local live Cognito sign-in, Documents views, upload controls, summary filtering/scrolling, and desktop/mobile layouts have been browser-checked. Full live upload/approval and CSV import validation remains part of the integration checkpoints. Header role controls were removed at Akshaya's request; Cognito group-based roles remain.
+
 
 ---
 

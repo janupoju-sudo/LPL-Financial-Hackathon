@@ -486,3 +486,21 @@ a.kpi:hover { background: var(--glass-strong); }
   .ask-panel { top: 12px; right: 12px; bottom: 12px; max-width: calc(100% - 24px); }
 }
 td.nowrap { white-space: nowrap; }
+
+.documents-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.documents-tabs { margin: 0; gap: 24px; border-bottom-color: var(--border); flex-wrap: wrap; }
+.documents-tabs button { font-size: 12px; padding: 14px 0; }
+.documents-upload-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.documents-upload-heading h2 { font-size: 15px; }
+.documents-upload-heading button { padding: 6px; }
+.documents-upload .dropzone { margin-top: 12px; }
+.documents-tabs + .vendor-panel { margin-top: 22px; }
+
+.filters .search-field { min-width: 180px; }
+
+.documents-summary { gap: 20px; }
+.documents-summary button { padding: 8px 10px; border-radius: 7px; text-align: left; }
+.documents-summary button:hover, .documents-summary button[aria-pressed="true"] { background: var(--surface-soft); }
+.documents-summary button:hover { text-decoration: underline; text-underline-offset: 3px; }
+.document-results { scroll-margin-top: 100px; }
+.document-results:focus { outline: 2px solid var(--primary); outline-offset: 6px; border-radius: 7px; }
