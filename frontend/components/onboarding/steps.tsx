@@ -2,9 +2,9 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { Building2, Check, FileText, Link2, Plus, ShieldCheck, Trash2, UploadCloud, UserRound } from 'lucide-react';
+import { BookOpen, Building2, Check, ChevronDown, CircleHelp, Crown, FileText, Link2, Minus, Plus, ShieldCheck, Trash2, UploadCloud, UserRound, Wrench } from 'lucide-react';
 import { fadeUp, spring, stagger } from '../motion';
-import { type Answers, type Member, type TeamRole, REVENUE_TYPES, ROLE_INFO, SETUP_TASKS, STARTER_RULES } from './data';
+import { type Answers, type GuideRole, type Member, type TeamRole, CAPABILITIES, REVENUE_TYPES, ROLE_GUIDE, ROLE_INFO, SETUP_TASKS, STARTER_RULES } from './data';
 
 type StepProps = { answers: Answers; update: (patch: Partial<Answers>) => void };
 
@@ -73,7 +73,44 @@ export function BusinessStep({ answers, update }: StepProps) {
 
 let memberSeq = 0;
 
+const ROLE_ICONS = { owner: Crown, partner: ShieldCheck, ops: Wrench, lpl_bookkeeper: BookOpen } as const;
+const roleSummary = (role: GuideRole) => ROLE_GUIDE.find(r => r.role === role)!.summary;
+
+// "What each role does": a collapsible guide, closed by default. Only the open/close is animated.
+function RoleGuide({ open, setOpen }: { open: boolean; setOpen: (open: boolean) => void }) {
+  return (
+    <Item variants={fadeUp} className={`ob-guide ${open ? 'open' : ''}`} id="role-guide">
+      <button type="button" className="ob-guide-toggle" aria-expanded={open} aria-controls="role-guide-body" onClick={() => setOpen(!open)}>
+        <strong>What each role does</strong>
+        <motion.span className="ob-guide-chevron" animate={{ rotate: open ? 180 : 0 }} transition={spring}><ChevronDown size={18} /></motion.span>
+      </button>
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div id="role-guide-body" key="body" className="ob-guide-body"
+            initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
+            transition={{ height: { type: 'spring', stiffness: 260, damping: 32 }, opacity: { duration: 0.2 } }}>
+            <div className="ob-guide-grid">
+              {ROLE_GUIDE.map(r => {
+                const Icon = ROLE_ICONS[r.role];
+                return (
+                  <div key={r.role} className="ob-guide-tile">
+                    <span className="ob-guide-title"><span className="ob-guide-icon"><Icon size={15} /></span>{r.label}</span>
+                    <small>{r.summary}</small>
+                    <span className="ob-caps">{CAPABILITIES.map(c => { const yes = r.can.includes(c.key); return <span key={c.key} className={`ob-cap ${yes ? 'yes' : ''}`}>{yes ? <Check size={11} /> : <Minus size={11} />}{c.label}</span>; })}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </Item>
+  );
+}
+
 export function TeamStep({ answers, update }: StepProps) {
+  const [guideOpen, setGuideOpen] = useState(false);
+  const showGuide = () => { setGuideOpen(true); setTimeout(() => document.getElementById('role-guide')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 250); };
   const set = (id: string, patch: Partial<Member>) => update({ team: answers.team.map(m => m.id === id ? { ...m, ...patch } : m) });
   const add = () => update({ team: [...answers.team, { id: `new-${Date.now()}-${memberSeq++}`, name: '', email: '', role: 'ops' }] });
   return (
@@ -94,19 +131,26 @@ export function TeamStep({ answers, update }: StepProps) {
               </div>
               <div className="ob-roles" role="radiogroup" aria-label={`Role for ${m.name || 'teammate'}`}>
                 {(Object.keys(ROLE_INFO) as TeamRole[]).map(role => (
-                  <button type="button" key={role} role="radio" aria-checked={m.role === role} className={m.role === role ? 'on' : ''} onClick={() => set(m.id, { role })} title={ROLE_INFO[role].blurb}>
+                  <button type="button" key={role} role="radio" aria-checked={m.role === role} className={m.role === role ? 'on' : ''} onClick={() => set(m.id, { role })}>
                     {m.role === role && <motion.span layoutId={`role-${m.id}`} className="ob-roles-pill" transition={spring} />}
                     <span>{ROLE_INFO[role].label}</span>
                   </button>
                 ))}
               </div>
+              <AnimatePresence mode="wait" initial={false}>
+                <motion.small key={m.role} className="ob-role-note" initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 4 }} transition={{ duration: 0.18 }}>{roleSummary(m.role)}</motion.small>
+              </AnimatePresence>
               <button type="button" className="ob-icon-btn" onClick={() => update({ team: answers.team.filter(x => x.id !== m.id) })} aria-label={`Remove ${m.name || 'teammate'}`}><Trash2 size={15} /></button>
             </motion.li>
           ))}
         </AnimatePresence>
       </motion.ul>
-      <Item variants={fadeUp}><button type="button" className="ob-add" onClick={add}><Plus size={15} />Add a teammate</button></Item>
-      <Item variants={fadeUp} className="ob-note"><ShieldCheck size={16} />Nobody can approve a bill they uploaded. Partners approve anything over your limit.</Item>
+      <Item variants={fadeUp} className="ob-team-actions">
+        <button type="button" className="ob-add" onClick={add}><Plus size={15} />Add a teammate</button>
+        <button type="button" className="ob-link ob-guide-link" onClick={showGuide} aria-controls="role-guide-body" aria-expanded={guideOpen}><CircleHelp size={14} />Want to know what each role does?</button>
+      </Item>
+      <RoleGuide open={guideOpen} setOpen={setGuideOpen} />
+      <Item variants={fadeUp} className="ob-note"><ShieldCheck size={16} />Nobody can approve a bill they uploaded, whatever their role.</Item>
     </motion.div>
   );
 }

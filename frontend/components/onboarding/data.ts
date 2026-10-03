@@ -23,8 +23,24 @@ export const STEPS = [
 export const ROLE_INFO: Record<TeamRole, { label: string; blurb: string }> = {
   partner: { label: 'Partner', blurb: 'Approves large bills' },
   ops: { label: 'Operations', blurb: 'Uploads and prepares bills' },
-  lpl_bookkeeper: { label: 'LPL bookkeeper', blurb: 'Reviews the books' },
+  lpl_bookkeeper: { label: 'Bookkeeper', blurb: 'Reviews the books' },
 };
+
+// What each role can do, matching lib/permissions.ts (the API enforces the same rules).
+export type GuideRole = 'owner' | TeamRole;
+export const CAPABILITIES = [
+  { key: 'upload', label: 'Upload' },
+  { key: 'review', label: 'Check fields' },
+  { key: 'approve', label: 'Approve bills' },
+  { key: 'rules', label: 'Set rules' },
+] as const;
+export type Capability = (typeof CAPABILITIES)[number]['key'];
+export const ROLE_GUIDE: { role: GuideRole; label: string; summary: string; can: Capability[] }[] = [
+  { role: 'owner', label: 'Owner', summary: 'Runs the practice. Can do everything, including approving any bill and setting the rules.', can: ['upload', 'review', 'approve', 'rules'] },
+  { role: 'partner', label: 'Partner', summary: 'Approves bills your rules send to a partner, like anything over $1,000.', can: ['approve'] },
+  { role: 'ops', label: 'Operations', summary: 'Uploads invoices and card statements, and checks what Otter read before bills go out.', can: ['upload', 'review'] },
+  { role: 'lpl_bookkeeper', label: 'Bookkeeper', summary: 'Sees the books, statements and audit trail. Read-only, so nothing changes by accident.', can: [] },
+];
 
 export const REVENUE_TYPES: { key: RevenueType; label: string }[] = [
   { key: 'advisory', label: 'Advisory fees' },
