@@ -5,7 +5,7 @@ import rulesFixture from '@/mocks/rules.json';
 import financialsFixture from '@/mocks/financials.json';
 import reconciliationFixture from '@/mocks/reconciliation.json';
 import askFixture from '@/mocks/ask.json';
-import type { Answer, Bill, BillDetail, BillReview, CardTransaction, Document, ExportResult, Financials, Reconciliation, Role, Rule, Vendor } from './types';
+import type { Answer, Bill, BillApprovalChanges, BillDetail, BillReview, CardTransaction, Document, ExportResult, Financials, Reconciliation, Role, Rule, Vendor } from './types';
 import { normalizeBill, normalizeBillDetail, normalizeDocument, normalizeFinancials, normalizeReconciliation, normalizeRule, normalizeVendor, toApiRule, type ApiBill, type ApiDocument, type ApiRule, type ApiVendor, type LegacyFinancials } from './contracts';
 import { localDocuments } from './local-documents';
 import { validateLocalApi } from './local-mode';
@@ -52,13 +52,14 @@ export const api = {
   financials: (period: string) => MOCK_D ? Promise.resolve(mockFinancials()) : request<Financials | LegacyFinancials>(`/financials?period=${encodeURIComponent(period)}`).then(normalizeFinancials),
   reconciliation: (period: string) => MOCK_D ? Promise.resolve(clone(reconciliationFixture)) : request<Parameters<typeof normalizeReconciliation>[0]>(`/revenue/reconciliation?period=${encodeURIComponent(period)}`).then(normalizeReconciliation),
   ask: (question: string) => MOCK_D ? Promise.resolve({ ...clone(askFixture), answer: `Demo response (sample context): ${askFixture.answer}` } as Answer) : request<Answer>('/ask', { question }),
-  async decision(id: string, decision: 'approve' | 'reject', comment: string, role: Role) {
+  async decision(id: string, decision: 'approve' | 'reject', comment: string, role: Role, changes?: BillApprovalChanges) {
     if (USE_LOCAL_API) throw new Error('D’s local server does not support bill decisions.');
-    if (!USE_MOCKS) { const result = await request<{ billId: string; status: string }>(`/bills/${encodeURIComponent(id)}/decision`, { decision, comment }); changed(); return { id: result.billId ?? id, status: result.status }; }
+    if (!USE_MOCKS) { const result = await request<{ billId: string; status: string }>(`/bills/${encodeURIComponent(id)}/decision`, { decision, comment, ...(changes ? { changes } : {}) }); changed(); return { id: result.billId ?? id, status: result.status }; }
     const bill = bills.find(b => b.id === id);
     if (!bill || bill.status !== 'pending_approval') throw new Error('This bill is not awaiting approval.');
     if (role !== 'partner' && role !== 'owner') throw new Error('Switch to Owner or Partner to make a decision.');
     if (decision === 'approve' && bill.ruleHits.some(hit => hit.includes('missing'))) throw new Error('Upload the vendor W-9 and void check before approval.');
+    if (decision === 'approve' && changes) { if (changes.glAccount) bill.glAccount = changes.glAccount; if (changes.invoiceNumber !== undefined) bill.invoiceNumber = changes.invoiceNumber; if (changes.dueDate) bill.dueDate = changes.dueDate; }
     bill.status = decision === 'approve' ? 'scheduled' : 'rejected'; changed(); return { id, status: bill.status };
   },
   async deleteRule(id: string) {

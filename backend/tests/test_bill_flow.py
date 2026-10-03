@@ -148,3 +148,27 @@ def test_rules_api_seeds_defaults_and_owner_only_edits(aws):
     assert r["statusCode"] == 201
     r = rules_api.handler(api_event("POST /rules", body={**new_rule, "action": "explode"}))
     assert r["statusCode"] == 400
+
+
+def test_approver_can_correct_category_invoice_and_due_date_when_approving(aws):
+    _, doc = setup_known_vendor()
+    out = create_bill.handler({"documentId": doc["documentId"], "vendorName": "Orion Software LLC",
+                               "amount": 1850, "invoiceNumber": "INV-9", "confidence": 0.9})
+    run_until_wait("p1", out["billId"])
+    path = {"id": out["billId"]}
+
+    r = bills_api.handler(api_event("POST /bills/{id}/decision", path,
+                                    {"decision": "approve", "changes": {"amount": 10}},
+                                    groups=("partner",), sub="user-partner"))
+    assert r["statusCode"] == 400 and "send the bill back" in body_of(r)["error"].lower()
+
+    r = bills_api.handler(api_event("POST /bills/{id}/decision", path, {"decision": "approve", "changes": {
+        "glAccount": "6320", "invoiceNumber": "INV-9A", "dueDate": "2026-11-01"}},
+        groups=("partner",), sub="user-partner"))
+    assert r["statusCode"] == 200, body_of(r)
+    bill = repo.get_bill("p1", out["billId"])
+    assert (bill["glAccount"], bill["invoiceNumber"], bill["dueDate"]) == ("6320", "INV-9A", "2026-11-01")
+    assert any(a["action"] == "edited" and "6320" in a["detail"] for a in bill["audit"])
+
+    post_ledger.handler({"practiceId": "p1", "billId": out["billId"]})
+    assert ledger.account_balances(ddb.get_ledger_entries("p1", "2026-01-01", "2027-12-31"))["6320"] == 185000
