@@ -4,7 +4,7 @@ import type { AccountLine, AuditEvent, Bill, BillDetail, BillStatus, Document, F
  * ratio units follow the statement shape, never the magnitude of a KPI value. */
 export interface LegacyFinancials {
   period: string;
-  pnl: { revenue: number; expenses: number; netIncome: number; revenueLines: AccountLine[]; expenseLines: AccountLine[] };
+  pnl: { revenue: number; expenses: number; netIncome: number; revenueLines: AccountLine[]; expenseLines: AccountLine[]; monthly?: Financials['monthly'] };
   balanceSheet: { asOf: string; assets: number; liabilities: number; equity: number; assetLines: AccountLine[]; liabilityLines: AccountLine[]; equityLines: AccountLine[] };
   cashFlow: { operating: number; financing: number; net: number; beginningCash: number; endingCash: number; operatingLines: { label: string; amount: number }[]; financingLines: { label: string; amount: number }[] };
   kpis: { margin: number | null; recurringPct: number | null; revPerClient: number | null; expenseRatios: { account: string; name: string; ratio: number | null }[]; previous: { period: string; revenue: number; margin: number | null; recurringPct: number | null } };
@@ -20,7 +20,8 @@ export function normalizeFinancials(response: Financials | LegacyFinancials): Fi
     balanceSheet: { asOf: data.balanceSheet.asOf, assets: data.balanceSheet.assetLines, totalAssets: data.balanceSheet.assets, liabilities: data.balanceSheet.liabilityLines, totalLiabilities: data.balanceSheet.liabilities, equity: data.balanceSheet.equityLines, totalEquity: data.balanceSheet.equity },
     cashFlow: { period: data.period, beginningCash: data.cashFlow.beginningCash, operating: data.cashFlow.operatingLines, netOperating: data.cashFlow.operating, financing: data.cashFlow.financingLines, netFinancing: data.cashFlow.financing, netChange: data.cashFlow.net, endingCash: data.cashFlow.endingCash },
     kpis: { margin: ratio(data.kpis.margin), recurringPct: ratio(data.kpis.recurringPct), revPerClient: data.kpis.revPerClient, expenseRatios: data.kpis.expenseRatios.map(row => ({ ...row, ratio: ratio(row.ratio) })), previous: { period: data.kpis.previous.period, totalRevenue: data.kpis.previous.revenue, margin: ratio(data.kpis.previous.margin), recurringPct: ratio(data.kpis.previous.recurringPct) } },
-    valuation: data.valuation
+    valuation: data.valuation,
+    ...(data.pnl.monthly ? { monthly: data.pnl.monthly } : {})
   };
 }
 type MainReconciliation = Omit<Reconciliation, 'flags'> & { flags: (Omit<Reconciliation['flags'][number], 'message'> & { reason: string; message?: string })[] };
