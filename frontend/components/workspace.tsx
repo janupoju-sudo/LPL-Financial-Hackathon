@@ -194,7 +194,7 @@ function App({ signOut }: { signOut?: () => void }) {
     <div className="main-area"><header className="topbar">
         <button className="topbar-search" onClick={() => setPalette(true)} aria-label="Search, ask or jump to a page"><Search size={18} /><span>Search, ask, or jump…</span><kbd>⌘K</kbd></button>
         <div className="topbar-right">
-          {canUpload && <Link className="icon-button" href="/documents?upload=1" aria-label="Upload a document" title="Upload a document"><Plus size={19} /></Link>}
+          {canUpload && !path.startsWith('/documents') && <Link className="icon-button" href="/documents?upload=1" aria-label="Upload a document" title="Upload a document"><Plus size={19} /></Link>}
           <div className="topbar-chip"><ProfileSettings name={userName} role={label(role)} signOut={signOut} /></div></div></header>
       <main className="content">{USE_LOCAL_API && <div className="alert">Local sample data: financials, reconciliation, Ask and export use D’s server. Uploads and approvals are unavailable.</div>}
         {error && <div role="alert" className="alert error">{error}<Button variant="outline" onClick={() => { setLoading(true); void refresh(); }}>Retry</Button></div>}
