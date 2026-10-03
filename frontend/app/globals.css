@@ -10,8 +10,8 @@
   --blob1: #e5d6bf;
   --blob2: #dde3d3;
   --blob3: #efe7d9;
-  --glass: rgb(253 250 244 / 62%);
-  --glass-strong: rgb(253 250 244 / 90%);
+  --glass: #fbf8f2;
+  --glass-strong: #fdfaf5;
   --glass-line: rgb(255 255 255 / 70%);
   --surface: #fbf8f2;
   --surface-2: rgb(255 252 246 / 55%);
@@ -71,8 +71,8 @@
   --blob1: #2a2118;
   --blob2: #1b2620;
   --blob3: #201a13;
-  --glass: rgb(36 30 23 / 55%);
-  --glass-strong: rgb(38 32 25 / 92%);
+  --glass: #1f1a14;
+  --glass-strong: #251f18;
   --glass-line: rgb(255 240 220 / 7%);
   --surface: #1f1a14;
   --surface-2: rgb(255 240 220 / 4%);
@@ -149,8 +149,7 @@ dl { margin: 0; }
 .backdrop i:nth-child(2) { width: 600px; height: 600px; right: -160px; top: 120px; background: var(--blob2); }
 .backdrop i:nth-child(3) { width: 520px; height: 520px; left: 30%; bottom: -260px; background: var(--blob3); }
 .glass, .panel, .kpi, .insight-card, .sidebar, .topbar-search, .topbar-chip, .subnav, .document-modal, .settings-dialog, .toast, .ask-panel, .palette {
-  background: var(--glass); border: 1px solid var(--glass-line); box-shadow: var(--shadow);
-  backdrop-filter: blur(22px) saturate(140%); -webkit-backdrop-filter: blur(22px) saturate(140%);
+  background: var(--glass); border: 1px solid var(--line); box-shadow: var(--shadow);
 }
 
 /* ------------------------------------------------------------------ buttons */
@@ -355,8 +354,7 @@ a.kpi:hover { background: var(--glass-strong); }
 .vendor-cell { display: inline-flex; align-items: center; gap: 12px; font-weight: 500; }
 .vendor-avatar { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 12px; background: var(--hover); color: var(--ink-2); font-size: 11.5px; font-weight: 600; flex-shrink: 0; }
 .amount { font: 500 13.5px var(--mono); white-space: nowrap; }
-.insight-card { display: flex; flex-direction: column; gap: 8px; padding: 22px; margin-bottom: 18px; border-radius: var(--r-xl); background: linear-gradient(140deg, rgb(255 255 255 / 55%), color-mix(in srgb, var(--blob1) 60%, transparent) 60%, color-mix(in srgb, var(--blob2) 60%, transparent)); }
-:root[data-theme="dark"] .insight-card { background: linear-gradient(140deg, rgb(40 48 44 / 60%), rgb(22 48 42 / 60%) 60%, rgb(27 34 54 / 60%)); }
+.insight-card { display: flex; flex-direction: column; gap: 8px; padding: 22px; margin-bottom: 18px; border-radius: var(--r-xl); background: var(--glass); }
 .insight-card h2 { font-size: 17px; }
 .insight-card p { color: var(--ink-2); font-size: 13px; }
 .insight-icon { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 12px; background: var(--accent); color: var(--accent-ink); margin-bottom: 4px; }
@@ -566,8 +564,9 @@ td.nowrap { white-space: nowrap; }
 .dropzone .drive-import p { max-width: 640px; margin: 12px auto 0; overflow-wrap: anywhere; }
 
 /* ── Otter brand, landing page and onboarding wizard ─────────────────────────── */
-.otter-art { display: block; user-select: none; -webkit-user-drag: none; }
-:root[data-theme="dark"] .otter-art { filter: invert(1) brightness(1.6) hue-rotate(180deg); }
+.otter-art { display: block; flex-shrink: 0; background: var(--accent); -webkit-mask: var(--art) center / contain no-repeat; mask: var(--art) center / contain no-repeat; }
+.otter-mark { --art: url("/otter-mark.png"); }
+.otter-logo { --art: url("/otter-logo.png"); }
 .brand-icon.otter { background: none; width: 32px; height: 32px; border-radius: 0; }
 .gate-loading { min-height: 100dvh; background: var(--bg); }
 
