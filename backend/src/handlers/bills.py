@@ -7,6 +7,8 @@ POST /bills/{id}/confirm      {amount?, vendorName?, vendorId?, dueDate?, glAcco
                               human review for low-confidence extractions; starts the workflow
 POST /bills/{id}/receive      marks goods/services received; re-evaluates a held bill
 """
+from datetime import date
+
 from botocore.exceptions import ClientError
 
 from shared import coa, config, repo, workflow
@@ -64,6 +66,42 @@ def _resume_or_restore(caller, bill, token, output):
         raise
 
 
+# Fields an approver may correct while approving. Amount and vendor decided which rules applied,
+# so changing those means sending the bill back for review instead.
+APPROVAL_EDITABLE = ("glAccount", "invoiceNumber", "dueDate")
+
+
+def _apply_approval_changes(caller, bill, changes):
+    if not isinstance(changes, dict):
+        raise HttpError(400, "changes must be an object")
+    unknown = set(changes) - set(APPROVAL_EDITABLE)
+    if unknown:
+        raise HttpError(400, f"Only {', '.join(APPROVAL_EDITABLE)} can change at approval; "
+                             f"send the bill back for review to change {', '.join(sorted(unknown))}")
+    fields = {}
+    if "glAccount" in changes:
+        gl = str(changes["glAccount"])
+        if not coa.is_expense(gl):
+            raise HttpError(400, "glAccount must be an expense account (6xxx)")
+        fields.update(glAccount=gl, glAccountName=coa.name(gl), glAccountReason=f"Set by {caller.label} at approval.")
+    if "invoiceNumber" in changes:
+        fields["invoiceNumber"] = str(changes["invoiceNumber"] or "").strip()[:60] or None
+    if "dueDate" in changes:
+        due = str(changes["dueDate"] or "")
+        try:
+            date.fromisoformat(due)
+        except ValueError:
+            raise HttpError(400, "dueDate must be YYYY-MM-DD")
+        fields["dueDate"] = due
+    fields = {k: v for k, v in fields.items() if v != bill.get(k)}
+    if not fields:
+        return
+    said = ", ".join(f"{k} {bill.get(k) or '-'} -> {v or '-'}" for k, v in fields.items() if k in APPROVAL_EDITABLE)
+    repo.update_bill(caller.practice_id, bill["billId"], set_fields=fields,
+                     audit=repo.audit_event(caller.label, "edited", said))
+    bill.update(fields)
+
+
 def decide(event):
     caller = get_caller(event)
     bill = _load(caller, path_param(event, "id"))
@@ -85,6 +123,9 @@ def decide(event):
         raise HttpError(403, f"Only {', '.join(sorted(allowed))} can {decision} this bill")
     if decision == "approve" and bill.get("createdBy") == caller.sub and not config.ALLOW_SELF_APPROVAL:
         raise HttpError(403, "Segregation of duties: you can't approve a bill you submitted")
+
+    if decision == "approve" and body.get("changes"):
+        _apply_approval_changes(caller, bill, body["changes"])
 
     audit = repo.audit_event(caller.label, f"{decision}d" if decision == "approve" else "rejected", comment)
     token = _claim_task(caller, bill, "processing", audit)

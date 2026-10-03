@@ -28,3 +28,6 @@ export interface Reconciliation {
 }
 export interface Answer { answer: string; citations: { documentId: string; label: string; snippet: string }[]; period: string; }
 export interface ExportResult { downloadUrl: string; documents: number; ledgerLines: number; missing: string[]; }
+
+// What an approver may correct while approving (amount/vendor need a send-back instead).
+export interface BillApprovalChanges { glAccount?: string; invoiceNumber?: string; dueDate?: string; }

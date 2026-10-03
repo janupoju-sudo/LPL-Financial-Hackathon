@@ -390,7 +390,28 @@ a.kpi:hover { background: var(--glass-strong); }
 .extracted dd { margin: 0; font-size: 13.5px; overflow-wrap: anywhere; }
 .document-badges { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 12px 0 16px; }
 .recognized { display: flex; align-items: center; gap: 7px; padding: 10px 12px; border-radius: var(--r-sm); background: var(--ok-soft); color: var(--ok); font-size: 12.5px; font-weight: 500; margin-bottom: 12px; }
-.bill-drawer { width: 720px; }
+.bill-drawer { width: 1120px; }
+/* Bill review: invoice on the left, fields and the decision on the right */
+.review-layout { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+.review-preview { position: sticky; top: 0; display: grid; gap: 8px; }
+.review-preview iframe, .review-preview img, .review-preview > .empty { width: 100%; min-height: 600px; border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--hover); }
+.review-preview img { min-height: 0; height: auto; }
+.review-open { justify-self: start; font-size: 12.5px; }
+.review-side { display: grid; gap: 14px; padding: 18px; border-radius: var(--r-lg); background: var(--surface-2); border: 1px solid var(--line); }
+.review-side h2 { font-size: 16px; }
+.review-why { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; font-size: 12.5px; }
+.review-why .rule-hit { margin: 0; background: var(--warn-soft); color: var(--warn); }
+.review-fields { display: grid; gap: 12px; }
+.review-fields label { display: grid; gap: 6px; font-size: 12.5px; color: var(--muted); }
+.review-fields label > input, .review-fields label > select, .review-fields label > textarea { color: var(--ink); width: 100%; }
+.review-fields textarea { resize: vertical; }
+.review-fields > .button { justify-self: start; }
+.locked-field { display: flex; justify-content: space-between; gap: 12px; padding: 10px 12px; border-radius: var(--r-sm); background: var(--hover); font-size: 13px; }
+.locked-field span { color: var(--muted); }
+.locked-field strong { font-weight: 500; text-align: right; }
+.sendback { font-size: 12.5px; color: var(--muted); }
+.sendback .document-link { font-size: 12.5px; text-decoration: underline; text-underline-offset: 3px; }
+@media (max-width: 900px) { .review-layout { grid-template-columns: 1fr; } .review-preview { position: static; } .review-preview iframe, .review-preview > .empty { min-height: 360px; } }
 .bill-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 24px; margin: 4px 0 16px; }
 .bill-facts dt { font-size: 12px; color: var(--muted); margin-bottom: 3px; }
 .bill-facts dd { margin: 0; font-size: 13.5px; overflow-wrap: anywhere; }
